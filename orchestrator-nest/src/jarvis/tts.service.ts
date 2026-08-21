@@ -14,7 +14,7 @@ export class TtsService {
   private currentConfig: TtsConfig = {
     engine: (process.env.TTS_DEFAULT_ENGINE as TtsEngineType) || 'cosyvoice',
     voice: process.env.TTS_DEFAULT_VOICE || 'cosy-es-expressive',
-    rate: process.env.TTS_DEFAULT_RATE || '+15%',
+    rate: process.env.TTS_DEFAULT_RATE || '+30%',
   };
 
   constructor(
