@@ -104,18 +104,33 @@ async def generate_tts(req: TtsRequest):
             rate_str = f"+{pct}%" if pct >= 0 else f"{pct}%"
 
         communicate = edge_tts.Communicate(clean_text, mapped_voice, rate=rate_str)
-        audio_data = bytearray()
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                audio_data.extend(chunk["data"])
+        
+        # Recolectar audio con timeout de 12 segundos para evitar bloqueos
+        try:
+            audio_data = await asyncio.wait_for(
+                _collect_edge_audio(communicate), timeout=12.0
+            )
+        except asyncio.TimeoutError:
+            print(f"[CosyVoice] Timeout synthesizing: '{clean_text[:40]}...'")
+            raise HTTPException(status_code=504, detail="TTS synthesis timeout")
 
         if len(audio_data) > 0:
             return Response(content=bytes(audio_data), media_type="audio/mpeg")
         else:
             raise HTTPException(status_code=500, detail="Audio buffer vacío")
+    except HTTPException:
+        raise
     except Exception as err:
         print(f"[CosyVoice Error]: {err}")
         raise HTTPException(status_code=500, detail=str(err))
+
+async def _collect_edge_audio(communicate) -> bytearray:
+    """Coroutine que acumula todos los bytes de audio de edge_tts"""
+    audio_data = bytearray()
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            audio_data.extend(chunk["data"])
+    return audio_data
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

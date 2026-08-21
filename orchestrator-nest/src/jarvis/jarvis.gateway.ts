@@ -110,27 +110,41 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // 3. Cargar historial de conversación persistido desde PostgreSQL
     const clientHistory = await this.ragService.loadConversationHistory(this.SESSION_ID, 12);
 
-    // 4. Stream tokens con cola secuencial (FIFO estricto) para TTS en tiempo real
+    // 4. Stream tokens con pipeline paralelo de TTS en tiempo real
+    //    - Umbral agresivo: primera frase se despacha con apenas 10 chars + puntuación
+    //    - Comas siempre cortan para mantener la latencia baja
+    //    - Pre-fetch: se sintetiza el siguiente chunk MIENTRAS el actual se emite
     let sentenceBuffer = '';
     let fullAssistantResponse = '';
-    let isFirstChunk = true;
+    let chunkIndex = 0;
 
-    // Cola secuencial de promesas para garantizar que los audios se emiten en orden cronológico exacto
-    let ttsQueue = Promise.resolve();
+    // Pipeline de pre-fetch: sintetiza hasta 2 frases en paralelo manteniendo el orden FIFO
+    const pendingAudioSlots: Promise<{ idx: number; audio: Buffer | null; text: string }>[] = [];
+    let emitQueue = Promise.resolve();
 
     const dispatchAudioChunk = (sentence: string) => {
       const cleanSentence = sentence.trim();
       if (cleanSentence.length < 2) return;
 
-      ttsQueue = ttsQueue.then(async () => {
-        try {
-          const audioBuffer = await this.ttsService.synthesizeSentence(cleanSentence);
-          if (audioBuffer && audioBuffer.length > 0) {
-            this.logger.log(`🔊 [TTS STREAM] Sent audio chunk (${audioBuffer.length} bytes) -> "${cleanSentence}"`);
-            client.emit('audio_chunk', audioBuffer.toString('base64'));
-          }
-        } catch (err) {
-          this.logger.warn(`TTS sentence synthesis failed: ${err.message}`);
+      const myIdx = chunkIndex++;
+
+      // Lanzar síntesis inmediatamente (pre-fetch paralelo)
+      const synthesisPromise = this.ttsService
+        .synthesizeSentence(cleanSentence)
+        .then((buf) => ({ idx: myIdx, audio: buf, text: cleanSentence }))
+        .catch((err) => {
+          this.logger.warn(`TTS chunk #${myIdx} failed: ${err.message}`);
+          return { idx: myIdx, audio: null as Buffer | null, text: cleanSentence };
+        });
+
+      pendingAudioSlots.push(synthesisPromise);
+
+      // Emitir en orden FIFO estricto, pero la síntesis ya corre en paralelo
+      emitQueue = emitQueue.then(async () => {
+        const result = await synthesisPromise;
+        if (result.audio && result.audio.length > 0) {
+          this.logger.log(`🔊 [TTS #${result.idx}] (${result.audio.length} bytes) -> "${result.text}"`);
+          client.emit('audio_chunk', result.audio.toString('base64'));
         }
       });
     };
@@ -148,19 +162,20 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
       fullAssistantResponse += token;
       client.emit('text_token', token);
 
-      // Para el primer fragmento, si hay puntuación y ya tiene más de 18 caracteres, empezar a sintetizar de inmediato
-      const splitRegex = isFirstChunk && sentenceBuffer.length > 18
-        ? /([,;:.?!\n]+)/
-        : /([:.?!\n]+)/;
+      // Corte agresivo: siempre usar comas como delimitadores para mantener baja la latencia
+      // Para el primerísimo chunk, cortar con apenas 10 chars + cualquier puntuación
+      const minLength = chunkIndex === 0 ? 10 : 20;
 
-      const match = splitRegex.exec(sentenceBuffer);
-      if (match) {
-        const sentenceEndIndex = match.index + match[0].length;
-        const completeSentence = sentenceBuffer.substring(0, sentenceEndIndex).trim();
-        sentenceBuffer = sentenceBuffer.substring(sentenceEndIndex);
-        isFirstChunk = false;
+      if (sentenceBuffer.length > minLength) {
+        const splitRegex = /([,;:.?!\n]+)/;
+        const match = splitRegex.exec(sentenceBuffer);
+        if (match) {
+          const sentenceEndIndex = match.index + match[0].length;
+          const completeSentence = sentenceBuffer.substring(0, sentenceEndIndex).trim();
+          sentenceBuffer = sentenceBuffer.substring(sentenceEndIndex);
 
-        dispatchAudioChunk(completeSentence);
+          dispatchAudioChunk(completeSentence);
+        }
       }
     }
 
@@ -169,8 +184,8 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
       dispatchAudioChunk(sentenceBuffer.trim());
     }
 
-    // Esperar a que la cola secuencial termine antes de emitir response_finished
-    await ttsQueue;
+    // Esperar a que toda la cola de emisión en orden termine
+    await emitQueue;
 
     // 5. Persistir turnos de conversación en PostgreSQL
     await this.ragService.saveConversationTurn(this.SESSION_ID, 'user', queryText);
