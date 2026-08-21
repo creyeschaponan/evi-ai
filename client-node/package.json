@@ -1,0 +1,12 @@
+{
+  "name": "evi-client-node",
+  "version": "1.0.0",
+  "description": "Cliente nativo de terminal para EVI con soporte de audio y micrófono permanente de Windows",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.7.5"
+  }
+}

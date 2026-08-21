@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EVI — Asistente de Voz Local</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(16, 24, 40, 0.85);
+      --card-border: rgba(56, 189, 248, 0.2);
+      --primary: #38bdf8;
+      --primary-glow: rgba(56, 189, 248, 0.4);
+      --accent: #818cf8;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --success: #34d399;
+      --danger: #f87171;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e293b 0%, var(--bg) 75%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    header {
+      text-align: center;
+      position: relative;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      margin-bottom: 0.75rem;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--danger);
+      box-shadow: 0 0 10px var(--danger);
+    }
+
+    .status-dot.connected {
+      background: var(--success);
+      box-shadow: 0 0 10px var(--success);
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      background: linear-gradient(135deg, #fff 30%, var(--primary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+    }
+
+    .voice-reactor {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      padding: 1.5rem;
+    }
+
+    .arc-reactor {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      border: 2px solid var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 25px var(--primary-glow);
+      position: relative;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      user-select: none;
+    }
+
+    .arc-reactor.active {
+      transform: scale(1.08);
+      border-color: var(--accent);
+      box-shadow: 0 0 45px rgba(129, 140, 248, 0.8);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1.05); }
+      50% { transform: scale(1.12); }
+    }
+
+    .arc-inner {
+      width: 65px;
+      height: 65px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--primary) 0%, rgba(56, 189, 248, 0.1) 70%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+    }
+
+    .engine-selector {
+      display: flex;
+      gap: 1rem;
+      background: rgba(15, 23, 42, 0.8);
+      padding: 0.4rem 0.8rem;
+      border-radius: 0.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 0.85rem;
+    }
+
+    .engine-selector label {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      cursor: pointer;
+    }
+
+    .response-box {
+      min-height: 140px;
+      max-height: 320px;
+      overflow-y: auto;
+      background: rgba(10, 15, 30, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      line-height: 1.6;
+      font-size: 1.05rem;
+      white-space: pre-wrap;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 0.5rem;
+      padding: 0.85rem 1rem;
+      color: white;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--primary);
+    }
+
+    button {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+      color: #040813;
+      font-weight: 700;
+      border-radius: 0.5rem;
+      padding: 0.85rem 1.5rem;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.2s ease;
+    }
+
+    button:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 640px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="status-badge">
+        <div id="statusDot" class="status-dot"></div>
+        <span id="statusText">Desconectado del Orquestador</span>
+      </div>
+      <h1>EVI LOCAL</h1>
+      <p class="subtitle">Asistente Personal de Inteligencia Artificial (RTX 3060 CUDA + Piper TTS + Faster Whisper + pgvector)</p>
+    </header>
+
+    <!-- Reactor & Voice Interaction -->
+    <div class="card voice-reactor">
+      <div id="reactorBtn" class="arc-reactor">
+        <div class="arc-inner">🎙️</div>
+      </div>
+      <div id="micStatus" style="font-size: 0.95rem; color: var(--text-muted); text-align: center;">
+        Haz clic en el Reactor para hablar
+      </div>
+
+      <!-- Selector de Motor de Reconocimiento de Voz -->
+      <div class="engine-selector">
+        <span>Motor de Reconocimiento:</span>
+        <label>
+          <input type="radio" name="sttEngine" value="web" checked />
+          ⚡ <b>Nativo Windows / Navegador</b> (Instantáneo)
+        </label>
+        <label>
+          <input type="radio" name="sttEngine" value="whisper" />
+          🤖 <b>Faster-Whisper (GPU Local)</b>
+        </label>
+      </div>
+    </div>
+
+    <!-- Live Response Stream -->
+    <div class="card">
+      <h3 style="margin-bottom: 0.75rem; font-size: 1.1rem; color: var(--primary);">Respuesta en Tiempo Real</h3>
+      <div id="responseBox" class="response-box">EVI lista. Haz clic en el Reactor o escribe abajo...</div>
+    </div>
+
+    <!-- Text Input Row -->
+    <div class="card">
+      <div class="input-row">
+        <input type="text" id="textInput" placeholder="Escribe tu comando o pregunta para EVI..." />
+        <button id="sendBtn">Enviar</button>
+      </div>
+    </div>
+
+    <!-- Memory & RAG Tooling -->
+    <div class="grid-2">
+      <div class="card">
+        <h4 style="margin-bottom: 0.5rem; color: var(--primary);">🧠 Guardar Memoria</h4>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Registra preferencias o hechos que Jarvis recordará.</p>
+        <div class="input-row" style="margin-bottom: 0.5rem;">
+          <input type="text" id="memoryInput" placeholder="Ej: Mi proyecto principal es Jarvis..." />
+        </div>
+        <button id="saveMemBtn" style="width: 100%; padding: 0.6rem;">Guardar en pgvector</button>
+      </div>
+
+      <div class="card">
+        <h4 style="margin-bottom: 0.5rem; color: var(--primary);">📚 Guardar Documento RAG</h4>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Agrega conocimiento técnico que se buscará semánticamente.</p>
+        <div class="input-row" style="margin-bottom: 0.5rem;">
+          <input type="text" id="knowledgeInput" placeholder="Ej: La API interna de Lambak corre en puerto..." />
+        </div>
+        <button id="saveKnowBtn" style="width: 100%; padding: 0.6rem;">Indexar Conocimiento</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const socket = io('http://localhost:3000', { transports: ['websocket'] });
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const responseBox = document.getElementById('responseBox');
+    const textInput = document.getElementById('textInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const reactorBtn = document.getElementById('reactorBtn');
+    const micStatus = document.getElementById('micStatus');
+
+    // Audio playback queue
+    const audioQueue = [];
+    let isPlayingAudio = false;
+
+    function playNextAudio() {
+      if (audioQueue.length === 0) {
+        isPlayingAudio = false;
+        reactorBtn.classList.remove('active');
+        return;
+      }
+
+      isPlayingAudio = true;
+      reactorBtn.classList.add('active');
+      const base64Wav = audioQueue.shift();
+      const audioBlob = new Blob([Uint8Array.from(atob(base64Wav), c => c.charCodeAt(0))], { type: 'audio/wav' });
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        playNextAudio();
+      };
+
+      audio.onerror = (e) => {
+        console.error('Audio playback error:', e);
+        playNextAudio();
+      };
+
+      audio.play().catch(e => {
+        console.warn('Audio auto-play blocked, user interaction required:', e);
+        playNextAudio();
+      });
+    }
+
+    // Socket Connection
+    socket.on('connect', () => {
+      statusDot.classList.add('connected');
+      statusText.textContent = 'JARVIS Conectado (localhost:3000)';
+    });
+
+    socket.on('disconnect', () => {
+      statusDot.classList.remove('connected');
+      statusText.textContent = 'Desconectado';
+    });
+
+    let currentResponse = '';
+
+    socket.on('text_token', (token) => {
+      currentResponse += token;
+      responseBox.textContent = currentResponse;
+      responseBox.scrollTop = responseBox.scrollHeight;
+    });
+
+    socket.on('audio_chunk', (base64Audio) => {
+      audioQueue.push(base64Audio);
+      if (!isPlayingAudio) {
+        playNextAudio();
+      }
+    });
+
+    socket.on('stt_transcription', (text) => {
+      if (text) {
+        responseBox.textContent = `🎙️ Has dicho: "${text}"\n\nJarvis pensando...`;
+      }
+    });
+
+    socket.on('response_finished', () => {
+      console.log('Stream response completed.');
+    });
+
+    function sendTextQuery(text) {
+      const query = (text || textInput.value).trim();
+      if (!query) return;
+      currentResponse = '';
+      responseBox.textContent = `👤 Tú: "${query}"\n\n🤖 Jarvis: Pensando...`;
+      socket.emit('voice_command_text', query);
+      if (!text) textInput.value = '';
+    }
+
+    sendBtn.addEventListener('click', () => sendTextQuery());
+    textInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendTextQuery();
+    });
+
+    // ----------------------------------------------------
+    // Reconocimiento de Voz: Opción 1 (Nativo Web/Windows) & Opción 2 (Whisper PCM)
+    // ----------------------------------------------------
+    let isListening = false;
+    let webSpeechRecognition = null;
+    let audioContext = null;
+    let mediaStream = null;
+    let pcmProcessor = null;
+    let recordedPcmSamples = [];
+
+    // Inicializar Web Speech API (Nativo de Chrome / Edge / Windows)
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      webSpeechRecognition = new SpeechRecognition();
+      webSpeechRecognition.lang = 'es-ES';
+      webSpeechRecognition.continuous = false;
+      webSpeechRecognition.interimResults = true;
+
+      webSpeechRecognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(r => r[0].transcript)
+          .join('');
+        micStatus.textContent = `Escuchando: "${transcript}"`;
+        if (event.results[0].isFinal) {
+          stopListening();
+          sendTextQuery(transcript);
+        }
+      };
+
+      webSpeechRecognition.onerror = (e) => {
+        console.error('Web Speech Error:', e);
+        micStatus.textContent = 'Error en reconocimiento de voz: ' + e.error;
+        stopListening();
+      };
+
+      webSpeechRecognition.onend = () => {
+        if (isListening) stopListening();
+      };
+    }
+
+    // Convertir Float32 audio a 16-bit Linear PCM (16kHz)
+    function export16BitPCM(samples, sampleRate, targetRate = 16000) {
+      const ratio = sampleRate / targetRate;
+      const targetLength = Math.round(samples.length / ratio);
+      const buffer = new ArrayBuffer(targetLength * 2);
+      const view = new DataView(buffer);
+
+      for (let i = 0; i < targetLength; i++) {
+        const sourceIndex = Math.floor(i * ratio);
+        let s = Math.max(-1, Math.min(1, samples[sourceIndex]));
+        view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+      return buffer;
+    }
+
+    async function startListening() {
+      const engine = document.querySelector('input[name="sttEngine"]:checked').value;
+      isListening = true;
+      reactorBtn.classList.add('active');
+
+      if (engine === 'web' && webSpeechRecognition) {
+        // Motor Nativo Windows / Web
+        micStatus.textContent = '🎙️ Escuchando (Nativo)... Habla ahora.';
+        try {
+          webSpeechRecognition.start();
+        } catch (e) {
+          console.warn('Recognition start error:', e);
+        }
+      } else {
+        // Motor Faster-Whisper GPU con PCM Real 16kHz
+        micStatus.textContent = '🎙️ Grabando PCM para Faster-Whisper... Habla y pulsa para detener.';
+        recordedPcmSamples = [];
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(mediaStream);
+        pcmProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+
+        pcmProcessor.onaudioprocess = (e) => {
+          if (!isListening) return;
+          const channelData = e.inputBuffer.getChannelData(0);
+          recordedPcmSamples.push(new Float32Array(channelData));
+        };
+
+        source.connect(pcmProcessor);
+        pcmProcessor.connect(audioContext.destination);
+      }
+    }
+
+    async function stopListening() {
+      const engine = document.querySelector('input[name="sttEngine"]:checked').value;
+      isListening = false;
+      reactorBtn.classList.remove('active');
+      micStatus.textContent = 'Haz clic en el Reactor para hablar';
+
+      if (engine === 'web' && webSpeechRecognition) {
+        try { webSpeechRecognition.stop(); } catch (e) {}
+      } else if (audioContext && mediaStream) {
+        // Detener grabación de audio
+        if (pcmProcessor) pcmProcessor.disconnect();
+        mediaStream.getTracks().forEach(track => track.stop());
+
+        micStatus.textContent = 'Transcribiendo con Faster-Whisper (GPU)...';
+        // Unir todos los buffers de audio en Float32
+        const totalLength = recordedPcmSamples.reduce((acc, curr) => acc + curr.length, 0);
+        const mergedSamples = new Float32Array(totalLength);
+        let offset = 0;
+        for (const chunk of recordedPcmSamples) {
+          mergedSamples.set(chunk, offset);
+          offset += chunk.length;
+        }
+
+        // Convertir a PCM 16-bit 16000Hz estándar de Whisper
+        const pcm16Buffer = export16BitPCM(mergedSamples, audioContext.sampleRate, 16000);
+        const base64Audio = btoa(
+          new Uint8Array(pcm16Buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+        );
+
+        await audioContext.close();
+        audioContext = null;
+
+        // Enviar a WebSocket
+        socket.emit('voice_command_audio', { buffer: base64Audio, rate: 16000 });
+      }
+    }
+
+    reactorBtn.addEventListener('click', () => {
+      if (!isListening) {
+        startListening();
+      } else {
+        stopListening();
+      }
+    });
+
+    // Memory & Knowledge Buttons
+    document.getElementById('saveMemBtn').addEventListener('click', () => {
+      const text = document.getElementById('memoryInput').value.trim();
+      if (text) {
+        socket.emit('save_memory', { text, category: 'preference' });
+        alert('Memoria enviada a indexar en pgvector.');
+        document.getElementById('memoryInput').value = '';
+      }
+    });
+
+    document.getElementById('saveKnowBtn').addEventListener('click', () => {
+      const content = document.getElementById('knowledgeInput').value.trim();
+      if (content) {
+        socket.emit('save_knowledge', { content });
+        alert('Documento enviado a indexar en pgvector.');
+        document.getElementById('knowledgeInput').value = '';
+      }
+    });
+  </script>
+</body>
+</html>
