@@ -110,10 +110,30 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // 3. Cargar historial de conversación persistido desde PostgreSQL
     const clientHistory = await this.ragService.loadConversationHistory(this.SESSION_ID, 12);
 
-    // 4. Stream tokens con buffer de oraciones para Piper TTS
+    // 4. Stream tokens con cola secuencial (FIFO estricto) para TTS en tiempo real
     let sentenceBuffer = '';
     let fullAssistantResponse = '';
-    const punctuationRegex = /([.?!;\n]+)/;
+    let isFirstChunk = true;
+
+    // Cola secuencial de promesas para garantizar que los audios se emiten en orden cronológico exacto
+    let ttsQueue = Promise.resolve();
+
+    const dispatchAudioChunk = (sentence: string) => {
+      const cleanSentence = sentence.trim();
+      if (cleanSentence.length < 2) return;
+
+      ttsQueue = ttsQueue.then(async () => {
+        try {
+          const audioBuffer = await this.ttsService.synthesizeSentence(cleanSentence);
+          if (audioBuffer && audioBuffer.length > 0) {
+            this.logger.log(`🔊 [TTS STREAM] Sent audio chunk (${audioBuffer.length} bytes) -> "${cleanSentence}"`);
+            client.emit('audio_chunk', audioBuffer.toString('base64'));
+          }
+        } catch (err) {
+          this.logger.warn(`TTS sentence synthesis failed: ${err.message}`);
+        }
+      });
+    };
 
     const stream = this.llmService.streamResponse(
       queryText,
@@ -128,43 +148,29 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
       fullAssistantResponse += token;
       client.emit('text_token', token);
 
-      const match = punctuationRegex.exec(sentenceBuffer);
+      // Para el primer fragmento, si hay puntuación y ya tiene más de 18 caracteres, empezar a sintetizar de inmediato
+      const splitRegex = isFirstChunk && sentenceBuffer.length > 18
+        ? /([,;:.?!\n]+)/
+        : /([:.?!\n]+)/;
+
+      const match = splitRegex.exec(sentenceBuffer);
       if (match) {
         const sentenceEndIndex = match.index + match[0].length;
         const completeSentence = sentenceBuffer.substring(0, sentenceEndIndex).trim();
         sentenceBuffer = sentenceBuffer.substring(sentenceEndIndex);
+        isFirstChunk = false;
 
-        if (completeSentence.length >= 2) {
-          this.ttsService
-            .synthesizeSentence(completeSentence)
-            .then((audioBuffer) => {
-              if (audioBuffer && audioBuffer.length > 0) {
-                this.logger.log(`[PIPER TTS] Sent WAV chunk of ${audioBuffer.length} bytes -> "${completeSentence}"`);
-                client.emit('audio_chunk', audioBuffer.toString('base64'));
-              }
-            })
-            .catch((err) => {
-              this.logger.warn(`TTS sentence synthesis failed: ${err.message}`);
-            });
-        }
+        dispatchAudioChunk(completeSentence);
       }
     }
 
     // Procesar cualquier remanente del buffer
     if (sentenceBuffer.trim().length >= 2) {
-      const remainingSentence = sentenceBuffer.trim();
-      this.ttsService
-        .synthesizeSentence(remainingSentence)
-        .then((audioBuffer) => {
-          if (audioBuffer && audioBuffer.length > 0) {
-            this.logger.log(`[PIPER TTS] Sent residual WAV chunk of ${audioBuffer.length} bytes -> "${remainingSentence}"`);
-            client.emit('audio_chunk', audioBuffer.toString('base64'));
-          }
-        })
-        .catch((err) => {
-          this.logger.warn(`TTS residual synthesis failed: ${err.message}`);
-        });
+      dispatchAudioChunk(sentenceBuffer.trim());
     }
+
+    // Esperar a que la cola secuencial termine antes de emitir response_finished
+    await ttsQueue;
 
     // 5. Persistir turnos de conversación en PostgreSQL
     await this.ragService.saveConversationTurn(this.SESSION_ID, 'user', queryText);

@@ -10,11 +10,11 @@ export class TtsService {
   private readonly logger = new Logger(TtsService.name);
   private readonly providers: Map<TtsEngineType, ITtsProvider> = new Map();
 
-  // Configuración activa por defecto
+  // Configuración activa por defecto: CosyVoice 3 Emocional / Táctico (F)
   private currentConfig: TtsConfig = {
-    engine: (process.env.TTS_DEFAULT_ENGINE as TtsEngineType) || 'edge',
-    voice: process.env.TTS_DEFAULT_VOICE || 'es-MX-DaliaNeural',
-    rate: process.env.TTS_DEFAULT_RATE || '+20%',
+    engine: (process.env.TTS_DEFAULT_ENGINE as TtsEngineType) || 'cosyvoice',
+    voice: process.env.TTS_DEFAULT_VOICE || 'cosy-es-expressive',
+    rate: process.env.TTS_DEFAULT_RATE || '+15%',
   };
 
   constructor(
@@ -43,7 +43,6 @@ export class TtsService {
   updateConfig(newConfig: Partial<TtsConfig>): TtsConfig {
     if (newConfig.engine && this.providers.has(newConfig.engine)) {
       this.currentConfig.engine = newConfig.engine;
-      // Si no especificó voz o cambió de motor, asignar la primera voz del motor
       const provider = this.providers.get(newConfig.engine);
       const voices = provider.getAvailableVoices();
       if (!newConfig.voice || !voices.some(v => v.id === newConfig.voice)) {
@@ -86,6 +85,7 @@ export class TtsService {
     if (!text) return '';
     return text
       .replace(/\[[^\]]*\]/g, '')
+      .replace(/<[^>]*>/g, '')
       .replace(/[\p{Extended_Pictographic}\u200d\uFE0F\uD83C-\uDBFF\uDC00-\uDFFF]/gu, '')
       .replace(/[*_`#~()]/g, ' ')
       .replace(/https?:\/\/\S+/gi, '')
@@ -107,7 +107,7 @@ export class TtsService {
       ...customConfig,
     };
 
-    const provider = this.providers.get(config.engine) || this.piperProvider;
+    const provider = this.providers.get(config.engine) || this.cosyvoiceProvider;
 
     try {
       const result = await provider.synthesize(cleanText, config.voice, config.rate);
