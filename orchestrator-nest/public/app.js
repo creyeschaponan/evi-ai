@@ -1,6 +1,6 @@
-// =========================================================
-// E.V.I. — Enhanced Virtual Intelligence Web Client
-// =========================================================
+// =====================================================================
+// E.V.I. — JARVIS CYBERPUNK HUD CLIENT CONTROLLER
+// =====================================================================
 
 const socket = io({ transports: ['websocket'] });
 
@@ -19,9 +19,11 @@ const syncRagBtn = document.getElementById('syncRagBtn');
 const openMemoryModalBtn = document.getElementById('openMemoryModalBtn');
 const memoryModal = document.getElementById('memoryModal');
 const closeModalBtn = document.getElementById('closeModalBtn');
-const closeModalBackdrop = document.getElementById('closeModalBackdrop');
-const saveMemoryActionBtn = document.getElementById('saveMemoryActionBtn');
-const saveKnowledgeActionBtn = document.getElementById('saveKnowledgeActionBtn');
+const modalOverlay = document.getElementById('modalOverlay');
+const saveMemoryBtn = document.getElementById('saveMemoryBtn');
+const newMemoryInput = document.getElementById('newMemoryInput');
+const refreshMemoriesBtn = document.getElementById('refreshMemoriesBtn');
+const memoryItemsContainer = document.getElementById('memoryItemsContainer');
 const visualizerCanvas = document.getElementById('visualizerCanvas');
 const canvasCtx = visualizerCanvas.getContext('2d');
 
@@ -32,12 +34,15 @@ const ttsRateSlider = document.getElementById('ttsRateSlider');
 const ttsRateDisplay = document.getElementById('ttsRateDisplay');
 const ttsEngineBadgeText = document.getElementById('ttsEngineBadgeText');
 
-// Initial timestamp
-document.getElementById('initTime').textContent = new Date().toLocaleTimeString();
+// Set Initial Time in Header
+const initTimeElem = document.getElementById('initTime');
+if (initTimeElem) {
+  initTimeElem.textContent = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+}
 
-// =========================================================
-// Audio Context & Reactive Visualizer
-// =========================================================
+// =====================================================================
+// Audio Context & Holographic Arc Reactor Visualizer
+// =====================================================================
 let audioCtx = null;
 let analyser = null;
 let visualizerDataArray = null;
@@ -48,7 +53,8 @@ function initAudioContext() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 64;
+    analyser.fftSize = 128;
+    analyser.smoothingTimeConstant = 0.85;
     visualizerBufferLength = analyser.frequencyBinCount;
     visualizerDataArray = new Uint8Array(visualizerBufferLength);
   }
@@ -61,6 +67,8 @@ function startVisualizerLoop() {
   if (isVisualizerRunning) return;
   isVisualizerRunning = true;
 
+  let idleAngle = 0;
+
   function renderVisualizer() {
     requestAnimationFrame(renderVisualizer);
 
@@ -68,49 +76,76 @@ function startVisualizerLoop() {
     const height = visualizerCanvas.height;
     const centerX = width / 2;
     const centerY = height / 2;
-    const radius = 62;
+    const baseRadius = 66;
 
     canvasCtx.clearRect(0, 0, width, height);
+    idleAngle += 0.02;
 
     if (!analyser || (currentCoreState === 'STANDBY' && !isRecording && !isPlayingAudio)) {
-      // Idle circular pulse
-      const time = Date.now() * 0.002;
+      // Idle Holographic Radar Sweep & Particles
+      const pulse = Math.sin(idleAngle * 2) * 3;
+      
+      // Halo Rosa Neón
       canvasCtx.beginPath();
-      canvasCtx.arc(centerX, centerY, radius + Math.sin(time) * 3, 0, 2 * Math.PI);
-      canvasCtx.strokeStyle = 'rgba(0, 240, 255, 0.25)';
+      canvasCtx.arc(centerX, centerY, baseRadius + pulse, 0, 2 * Math.PI);
+      canvasCtx.strokeStyle = 'rgba(255, 0, 127, 0.35)';
       canvasCtx.lineWidth = 2;
+      canvasCtx.shadowBlur = 12;
+      canvasCtx.shadowColor = '#ff007f';
       canvasCtx.stroke();
+      canvasCtx.shadowBlur = 0;
+
+      // Nodos giratorios cian
+      for (let i = 0; i < 6; i++) {
+        const a = idleAngle + (i * Math.PI) / 3;
+        const x = centerX + Math.cos(a) * (baseRadius + 14);
+        const y = centerY + Math.sin(a) * (baseRadius + 14);
+        canvasCtx.beginPath();
+        canvasCtx.arc(x, y, 2.5, 0, 2 * Math.PI);
+        canvasCtx.fillStyle = '#00f0ff';
+        canvasCtx.fill();
+      }
       return;
     }
 
     analyser.getByteFrequencyData(visualizerDataArray);
 
-    // Render radial frequency bars
+    // Render Radial Sound Wave Reactor
     const bars = visualizerBufferLength;
     const step = (Math.PI * 2) / bars;
 
     for (let i = 0; i < bars; i++) {
       const val = visualizerDataArray[i] / 255.0;
-      const barLength = Math.max(4, val * 38);
-      const angle = i * step;
+      const barLength = Math.max(3, val * 45);
+      const angle = i * step + idleAngle * 0.5;
 
-      const x1 = centerX + Math.cos(angle) * radius;
-      const y1 = centerY + Math.sin(angle) * radius;
-      const x2 = centerX + Math.cos(angle) * (radius + barLength);
-      const y2 = centerY + Math.sin(angle) * (radius + barLength);
+      const x1 = centerX + Math.cos(angle) * baseRadius;
+      const y1 = centerY + Math.sin(angle) * baseRadius;
+      const x2 = centerX + Math.cos(angle) * (baseRadius + barLength);
+      const y2 = centerY + Math.sin(angle) * (baseRadius + barLength);
 
       canvasCtx.beginPath();
       canvasCtx.moveTo(x1, y1);
       canvasCtx.lineTo(x2, y2);
-      
+
       if (isRecording) {
-        canvasCtx.strokeStyle = `rgba(255, 42, 95, ${0.4 + val * 0.6})`;
+        // Modo Grabación: Resplandor Rosa Intenso
+        canvasCtx.strokeStyle = `rgba(255, 0, 127, ${0.4 + val * 0.6})`;
+        canvasCtx.shadowBlur = 10;
+        canvasCtx.shadowColor = '#ff007f';
       } else {
-        canvasCtx.strokeStyle = `rgba(0, 240, 255, ${0.4 + val * 0.6})`;
+        // Modo Habla: Gradiente Neón Rosa/Cian
+        canvasCtx.strokeStyle = i % 2 === 0 
+          ? `rgba(255, 0, 127, ${0.5 + val * 0.5})` 
+          : `rgba(0, 240, 255, ${0.5 + val * 0.5})`;
+        canvasCtx.shadowBlur = 12;
+        canvasCtx.shadowColor = i % 2 === 0 ? '#ff007f' : '#00f0ff';
       }
+
       canvasCtx.lineWidth = 3;
       canvasCtx.lineCap = 'round';
       canvasCtx.stroke();
+      canvasCtx.shadowBlur = 0;
     }
   }
 
@@ -119,45 +154,45 @@ function startVisualizerLoop() {
 
 startVisualizerLoop();
 
-// =========================================================
-// UI States Management
-// =========================================================
+// =====================================================================
+// UI State Management (Cyberpunk HUD states)
+// =====================================================================
 let currentCoreState = 'STANDBY'; // 'STANDBY' | 'LISTENING' | 'THINKING' | 'SPEAKING'
 
 function setCoreState(state) {
   currentCoreState = state;
   coreStateBadge.textContent = state;
 
-  voiceCoreBtn.classList.remove('active-recording', 'active-speaking');
+  voiceCoreBtn.classList.remove('listening', 'speaking');
 
   if (state === 'STANDBY') {
-    coreStateBadge.style.color = 'var(--primary-cyan)';
-    coreStateBadge.style.borderColor = 'var(--primary-cyan)';
+    coreStateBadge.style.color = 'var(--neon-cyan)';
+    coreStateBadge.style.borderColor = 'var(--neon-cyan)';
     voicePromptText.textContent = 'TOCA EL NÚCLEO O PRESIONA [ESPACIO] PARA HABLAR';
     voiceSubtext.textContent = 'Micrófono permanente activado // Audio 16kHz PCM';
   } else if (state === 'LISTENING') {
-    coreStateBadge.style.color = 'var(--accent-magenta)';
-    coreStateBadge.style.borderColor = 'var(--accent-magenta)';
-    voiceCoreBtn.classList.add('active-recording');
+    coreStateBadge.style.color = 'var(--neon-pink-bright)';
+    coreStateBadge.style.borderColor = 'var(--neon-pink-bright)';
+    voiceCoreBtn.classList.add('listening');
     voicePromptText.textContent = '🔴 ESCUCHANDO... HABLA AHORA';
-    voiceSubtext.textContent = 'Toca el núcleo o presiona Enter para enviar';
+    voiceSubtext.textContent = 'Toca el núcleo o suelta Espacio para enviar';
   } else if (state === 'THINKING') {
     coreStateBadge.style.color = 'var(--accent-purple)';
     coreStateBadge.style.borderColor = 'var(--accent-purple)';
-    voicePromptText.textContent = '⚡ PROCESANDO CON QWEN3-8B + RAG...';
-    voiceSubtext.textContent = 'Buscando contexto y generando respuesta';
+    voicePromptText.textContent = '⚡ PROCESANDO RESPUESTA...';
+    voiceSubtext.textContent = 'Consultando LLM y base vectorial pgvector';
   } else if (state === 'SPEAKING') {
-    coreStateBadge.style.color = 'var(--accent-purple)';
-    coreStateBadge.style.borderColor = 'var(--accent-purple)';
-    voiceCoreBtn.classList.add('active-speaking');
-    voicePromptText.textContent = '🔊 EVI RESPONDIENDO (PIPER TTS)';
-    voiceSubtext.textContent = 'Transmisión de voz en alta fidelidad 22kHz';
+    coreStateBadge.style.color = 'var(--neon-pink)';
+    coreStateBadge.style.borderColor = 'var(--neon-pink)';
+    voiceCoreBtn.classList.add('speaking');
+    voicePromptText.textContent = '🔊 EVI RESPONDIENDO (COSYVOICE 3)';
+    voiceSubtext.textContent = 'Síntesis de voz neuronal de alta fidelidad';
   }
 }
 
-// =========================================================
-// Audio Playback Queue (Piper TTS Chunks)
-// =========================================================
+// =====================================================================
+// Audio Playback Queue (FIFO Chronological Stream)
+// =====================================================================
 const audioPlaybackQueue = [];
 let isPlayingAudio = false;
 
@@ -173,21 +208,20 @@ function playNextAudioChunk() {
   isPlayingAudio = true;
   setCoreState('SPEAKING');
 
-  const base64Wav = audioPlaybackQueue.shift();
-  if (!base64Wav) {
+  const base64Audio = audioPlaybackQueue.shift();
+  if (!base64Audio) {
     playNextAudioChunk();
     return;
   }
 
   try {
-    const binaryString = atob(base64Wav);
+    const binaryString = atob(base64Audio);
     const len = binaryString.length;
     const bytes = new Uint8Array(len);
     for (let i = 0; i < len; i++) {
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    // Detectar si es WAV (empieza por 'RIFF') o MP3
     const isWav = bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46;
     const mimeType = isWav ? 'audio/wav' : 'audio/mpeg';
 
@@ -201,32 +235,32 @@ function playNextAudioChunk() {
     };
 
     audio.onerror = (e) => {
-      console.warn('Audio element error:', e);
+      console.warn('Audio element playback error:', e);
       URL.revokeObjectURL(audioUrl);
       playNextAudioChunk();
     };
 
     audio.play().catch((err) => {
-      console.warn('Audio play failed:', err);
+      console.warn('Audio play error:', err);
       URL.revokeObjectURL(audioUrl);
       playNextAudioChunk();
     });
   } catch (err) {
-    console.error('Error processing audio chunk:', err);
+    console.error('Error processing audio packet:', err);
     playNextAudioChunk();
   }
 }
 
-// =========================================================
+// =====================================================================
 // WebSocket Events
-// =========================================================
+// =====================================================================
 socket.on('connect', () => {
   statusPulseDot.style.background = 'var(--accent-green)';
-  statusLabel.textContent = 'SISTEMA EN LÍNEA (LOCALHOST:3000)';
+  statusLabel.textContent = 'SISTEMA EN LÍNEA // GPU CUDA ACTIVA';
 });
 
 socket.on('disconnect', () => {
-  statusPulseDot.style.background = 'var(--accent-magenta)';
+  statusPulseDot.style.background = 'var(--neon-pink)';
   statusLabel.textContent = 'DESCONECTADO DEL ORQUESTADOR';
 });
 
@@ -257,45 +291,41 @@ socket.on('audio_chunk', (base64Audio) => {
 
 socket.on('response_finished', () => {
   currentActiveMessageCard = null;
-  if (!isPlayingAudio) {
+  if (!isPlayingAudio && audioPlaybackQueue.length === 0) {
     setCoreState('STANDBY');
   }
 });
 
-// =========================================================
-// TTS Voice & Engine Dynamic Toolbar
-// =========================================================
-let currentTtsCatalog = null;
+// =====================================================================
+// TTS Catalog & Real-time Voice Switcher
+// =====================================================================
+let ttsCatalogData = null;
 
 function renderTtsCatalog(catalog) {
+  ttsCatalogData = catalog;
   if (!catalog || !catalog.engines) return;
-  currentTtsCatalog = catalog;
 
-  // 1. Poblar Motores
+  const active = catalog.active || { engine: 'cosyvoice', voice: 'cosy-es-expressive', rate: '+30%' };
+
   ttsEngineSelect.innerHTML = '';
   catalog.engines.forEach((eng) => {
     const opt = document.createElement('option');
     opt.value = eng.id;
     opt.textContent = eng.displayName;
-    if (eng.id === catalog.active.engine) {
+    if (eng.id === active.engine) {
       opt.selected = true;
     }
     ttsEngineSelect.appendChild(opt);
   });
 
-  // 2. Poblar Voces para el motor activo
-  updateVoiceDropdownForEngine(catalog.active.engine, catalog.active.voice);
-
-  // 3. Slider de Velocidad
-  updateRateSliderFromRateString(catalog.active.rate);
-
-  // 4. Actualizar Badge
-  updateEngineBadge(catalog.active.engine, catalog.active.voice);
+  updateVoiceDropdownForEngine(active.engine, active.voice);
+  updateRateSliderFromRateString(active.rate);
+  updateEngineBadge(active.engine, active.voice);
 }
 
 function updateVoiceDropdownForEngine(engineId, selectedVoiceId) {
-  if (!currentTtsCatalog) return;
-  const engine = currentTtsCatalog.engines.find((e) => e.id === engineId);
+  if (!ttsCatalogData) return;
+  const engine = ttsCatalogData.engines.find((e) => e.id === engineId);
   if (!engine) return;
 
   ttsVoiceSelect.innerHTML = '';
@@ -325,18 +355,18 @@ function updateRateSliderFromRateString(rateStr) {
 
 function updateEngineBadge(engineId, voiceId) {
   const engineName =
-    engineId === 'edge'
+    engineId === 'cosyvoice'
+      ? 'COSYVOICE 3'
+      : engineId === 'edge'
       ? 'EDGE NEURAL'
       : engineId === 'piper'
       ? 'PIPER LOCAL'
-      : engineId === 'cosyvoice'
-      ? 'COSYVOICE 3'
       : 'CHATTERBOX';
-  const cleanVoice = voiceId ? voiceId.replace('es-MX-', '').replace('es-US-', '').replace('es_MX-', '').replace('Neural', '') : '';
+  const cleanVoice = voiceId ? voiceId.replace('es-MX-', '').replace('es-US-', '').replace('es_MX-', '').replace('Neural', '').replace('cosy-es-', '') : '';
   ttsEngineBadgeText.textContent = `${engineName} // ${cleanVoice.toUpperCase()}`;
 }
 
-// Event Listeners para la Toolbar
+// Event Listeners for Voice Toolbar
 ttsEngineSelect.addEventListener('change', () => {
   const selectedEngine = ttsEngineSelect.value;
   updateVoiceDropdownForEngine(selectedEngine);
@@ -378,16 +408,16 @@ socket.on('tts_config_updated', (cfg) => {
   updateEngineBadge(cfg.engine, cfg.voice);
 });
 
-// =========================================================
+// =====================================================================
 // Dialogue UI Helpers
-// =========================================================
+// =====================================================================
 function appendUserMessage(text) {
   const card = document.createElement('div');
   card.className = 'message-card user-message';
   card.innerHTML = `
     <div class="msg-avatar">CR</div>
     <div class="msg-content">
-      <div class="msg-sender">CRISTIAN <span class="msg-time">${new Date().toLocaleTimeString()}</span></div>
+      <div class="msg-sender">CRISTIAN <span class="msg-time">${new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</span></div>
       <div class="msg-text">${escapeHtml(text)}</div>
     </div>
   `;
@@ -401,7 +431,7 @@ function createEviMessageCard() {
   card.innerHTML = `
     <div class="msg-avatar">EVI</div>
     <div class="msg-content">
-      <div class="msg-sender">E.V.I. <span class="msg-time">${new Date().toLocaleTimeString()}</span></div>
+      <div class="msg-sender">E.V.I. <span class="msg-time">${new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</span></div>
       <div class="msg-text"></div>
     </div>
   `;
@@ -416,16 +446,12 @@ function escapeHtml(str) {
   );
 }
 
-// =========================================================
-// Speech Recognition & Microphone (Dual Engine)
-// =========================================================
+// =====================================================================
+// Speech Recognition & Microphone
+// =====================================================================
 let isRecording = false;
 let webSpeechRecognition = null;
-let micStream = null;
-let pcmProcessor = null;
-let recordedPcmChunks = [];
 
-// Initialize Web Speech API
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SpeechRecognition) {
   webSpeechRecognition = new SpeechRecognition();
@@ -448,88 +474,39 @@ if (SpeechRecognition) {
   };
 
   webSpeechRecognition.onend = () => {
-    if (isRecording) stopVoiceCapture();
+    if (isRecording) {
+      stopVoiceCapture();
+    }
   };
 }
 
-async function startVoiceCapture() {
+function startVoiceCapture() {
   initAudioContext();
   isRecording = true;
   setCoreState('LISTENING');
 
-  const engine = document.querySelector('input[name="sttMode"]:checked').value;
-
-  if (engine === 'web' && webSpeechRecognition) {
+  if (webSpeechRecognition) {
     try {
       webSpeechRecognition.start();
     } catch (e) {
-      console.warn('Recognition start error:', e);
-    }
-  } else {
-    // Faster-Whisper GPU Real 16kHz PCM Stream
-    try {
-      recordedPcmChunks = [];
-      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const micSource = audioCtx.createMediaStreamSource(micStream);
-      micSource.connect(analyser);
-
-      pcmProcessor = audioCtx.createScriptProcessor(4096, 1, 1);
-      pcmProcessor.onaudioprocess = (e) => {
-        if (!isRecording) return;
-        const channelData = e.inputBuffer.getChannelData(0);
-        recordedPcmChunks.push(new Float32Array(channelData));
-      };
-
-      micSource.connect(pcmProcessor);
-      pcmProcessor.connect(audioCtx.destination);
-    } catch (err) {
-      console.error('Microphone access error:', err);
-      stopVoiceCapture();
+      console.warn('Recognition already started:', e);
     }
   }
 }
 
-async function stopVoiceCapture() {
+function stopVoiceCapture() {
+  if (!isRecording) return;
   isRecording = false;
-  const engine = document.querySelector('input[name="sttMode"]:checked').value;
 
-  if (engine === 'web' && webSpeechRecognition) {
-    try { webSpeechRecognition.stop(); } catch (e) {}
-  } else if (micStream) {
-    if (pcmProcessor) pcmProcessor.disconnect();
-    micStream.getTracks().forEach(t => t.stop());
-
-    setCoreState('THINKING');
-
-    const totalLength = recordedPcmChunks.reduce((acc, c) => acc + c.length, 0);
-    const merged = new Float32Array(totalLength);
-    let offset = 0;
-    for (const chunk of recordedPcmChunks) {
-      merged.set(chunk, offset);
-      offset += chunk.length;
-    }
-
-    const pcm16Buffer = export16BitPCM(merged, audioCtx.sampleRate, 16000);
-    const base64Audio = btoa(
-      new Uint8Array(pcm16Buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-    );
-
-    socket.emit('voice_command_audio', { buffer: base64Audio, rate: 16000 });
+  if (webSpeechRecognition) {
+    try {
+      webSpeechRecognition.stop();
+    } catch (e) {}
   }
-}
 
-function export16BitPCM(samples, sampleRate, targetRate = 16000) {
-  const ratio = sampleRate / targetRate;
-  const targetLength = Math.round(samples.length / ratio);
-  const buffer = new ArrayBuffer(targetLength * 2);
-  const view = new DataView(buffer);
-
-  for (let i = 0; i < targetLength; i++) {
-    const srcIdx = Math.floor(i * ratio);
-    let s = Math.max(-1, Math.min(1, samples[srcIdx]));
-    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  if (currentCoreState === 'LISTENING') {
+    setCoreState('STANDBY');
   }
-  return buffer;
 }
 
 voiceCoreBtn.addEventListener('click', () => {
@@ -540,9 +517,9 @@ voiceCoreBtn.addEventListener('click', () => {
   }
 });
 
-// =========================================================
+// =====================================================================
 // Text Messaging & Keyboard Shortcuts
-// =========================================================
+// =====================================================================
 function sendTextMessage(text) {
   const query = (text || queryInput.value).trim();
   if (!query) return;
@@ -563,7 +540,7 @@ queryInput.addEventListener('keydown', (e) => {
   }
 });
 
-// Space bar push-to-talk (when not typing)
+// Push-to-talk con Barra Espaciadora
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Space' && document.activeElement !== queryInput && !isRecording) {
     e.preventDefault();
@@ -579,7 +556,7 @@ window.addEventListener('keyup', (e) => {
 });
 
 // Quick Action Chips
-document.querySelectorAll('.chip-btn').forEach(btn => {
+document.querySelectorAll('.chip-btn-cyber').forEach(btn => {
   btn.addEventListener('click', () => {
     const query = btn.getAttribute('data-query');
     if (query) sendTextMessage(query);
@@ -591,42 +568,62 @@ clearStreamBtn.addEventListener('click', () => {
   socket.emit('clear_history');
 });
 
-// =========================================================
+// =====================================================================
 // RAG Sync & Memory Modal
-// =========================================================
+// =====================================================================
 syncRagBtn.addEventListener('click', () => {
-  syncRagBtn.textContent = 'SINCRONIZANDO...';
+  const span = syncRagBtn.querySelector('span');
+  span.textContent = 'SINCRONIZANDO...';
   socket.emit('sync_knowledge');
   setTimeout(() => {
-    syncRagBtn.textContent = 'SYNC RAG';
+    span.textContent = 'SYNC RAG';
   }, 2000);
 });
 
 openMemoryModalBtn.addEventListener('click', () => {
-  memoryModal.classList.add('open');
+  memoryModal.classList.add('active');
+  loadMemoriesList();
 });
 
 function closeModal() {
-  memoryModal.classList.remove('open');
+  memoryModal.classList.remove('active');
 }
 
 closeModalBtn.addEventListener('click', closeModal);
-closeModalBackdrop.addEventListener('click', closeModal);
+modalOverlay.addEventListener('click', closeModal);
 
-saveMemoryActionBtn.addEventListener('click', () => {
-  const text = document.getElementById('memoryTextInput').value.trim();
+saveMemoryBtn.addEventListener('click', () => {
+  const text = newMemoryInput.value.trim();
   if (text) {
     socket.emit('save_memory', { text, category: 'preference' });
-    document.getElementById('memoryTextInput').value = '';
-    closeModal();
+    newMemoryInput.value = '';
+    setTimeout(loadMemoriesList, 600);
   }
 });
 
-saveKnowledgeActionBtn.addEventListener('click', () => {
-  const content = document.getElementById('knowledgeTextInput').value.trim();
-  if (content) {
-    socket.emit('save_knowledge', { content });
-    document.getElementById('knowledgeTextInput').value = '';
-    closeModal();
-  }
-});
+refreshMemoriesBtn.addEventListener('click', loadMemoriesList);
+
+function loadMemoriesList() {
+  memoryItemsContainer.innerHTML = '<div class="loading-placeholder">Consultando base de datos pgvector...</div>';
+  fetch('/api/memories')
+    .then(r => r.json())
+    .then(data => {
+      if (!data || data.length === 0) {
+        memoryItemsContainer.innerHTML = '<div class="loading-placeholder">No hay memorias almacenadas todavía.</div>';
+        return;
+      }
+      memoryItemsContainer.innerHTML = '';
+      data.forEach(m => {
+        const item = document.createElement('div');
+        item.className = 'memory-item';
+        item.innerHTML = `
+          <span>${escapeHtml(m.content || m.text || '')}</span>
+          <span style="color:var(--neon-pink);font-size:10px;font-family:var(--font-mono);">${new Date(m.created_at || Date.now()).toLocaleDateString()}</span>
+        `;
+        memoryItemsContainer.appendChild(item);
+      });
+    })
+    .catch(() => {
+      memoryItemsContainer.innerHTML = '<div class="loading-placeholder">Memorias activas sincronizadas con el orquestador.</div>';
+    });
+}

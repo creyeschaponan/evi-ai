@@ -3,39 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EVI — Interfaz Táctica de Inteligencia Artificial</title>
+  <title>EVI — Interfaz Táctica Jarvis Cyberpunk</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;1,400&family=Orbitron:wght@400;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body>
-  <!-- Fondo con Malla Holográfica y Partículas -->
+  <!-- Fondo Holográfico Cyberpunk con Rejilla y Partículas -->
   <div class="hologram-background">
     <div class="grid-overlay"></div>
-    <div class="glow-orb glow-orb-1"></div>
-    <div class="glow-orb glow-orb-2"></div>
-    <div class="spider-lines"></div>
+    <div class="scanlines"></div>
+    <div class="glow-orb glow-orb-pink"></div>
+    <div class="glow-orb glow-orb-cyan"></div>
+    <div class="glow-orb glow-orb-purple"></div>
   </div>
 
   <div class="hud-container">
-    <!-- Header Táctico HUD -->
+    <!-- Header Táctico HUD Jarvis / Cyberpunk -->
     <header class="hud-header">
       <div class="header-left">
         <div class="brand-badge">
           <span class="hud-corner top-left"></span>
           <span class="hud-corner bottom-right"></span>
           <div class="brand-icon">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
               <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
               <polyline points="2 17 12 22 22 17"></polyline>
               <polyline points="2 12 12 17 22 12"></polyline>
             </svg>
           </div>
           <div>
-            <h1 class="brand-title">E.V.I.</h1>
-            <p class="brand-subtitle">ENHANCED VIRTUAL INTELLIGENCE // SPIDER-TECH HUD</p>
+            <h1 class="brand-title">E.V.I. <span class="brand-version">v3.0</span></h1>
+            <p class="brand-subtitle">ENHANCED VIRTUAL INTELLIGENCE // JARVIS CYBERPUNK HUD</p>
           </div>
         </div>
       </div>
@@ -43,27 +44,27 @@
       <div class="header-center">
         <div class="status-pill" id="connectionStatusPill">
           <span class="pulse-dot" id="statusPulseDot"></span>
-          <span id="statusLabel">SISTEMA EN LÍNEA (LOCALHOST:3000)</span>
+          <span id="statusLabel">SISTEMA EN LÍNEA // GPU CUDA ACTIVA</span>
         </div>
       </div>
 
       <div class="header-right">
-        <button class="hud-btn-ghost" id="syncRagBtn" title="Sincronizar documentos Markdown con pgvector">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+        <button class="hud-btn-cyber pink" id="syncRagBtn" title="Sincronizar base de conocimiento con pgvector">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
           </svg>
-          SYNC RAG
+          <span>SYNC RAG</span>
         </button>
-        <button class="hud-btn-ghost" id="openMemoryModalBtn" title="Ver y guardar memorias">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+        <button class="hud-btn-cyber cyan" id="openMemoryModalBtn" title="Consultar y gestionar memorias persistentes">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 15h-2v-6h2zm0-8h-2V7h2z"/>
           </svg>
-          MEMORIA
+          <span>MEMORIA</span>
         </button>
       </div>
     </header>
 
-    <!-- Toolbar de Control de Voz y Motor TTS en Tiempo Real -->
+    <!-- Toolbar Táctica de Voz y Motor TTS -->
     <div class="hud-voice-toolbar">
       <div class="voice-toolbar-group">
         <label for="ttsEngineSelect" class="toolbar-label">
@@ -72,12 +73,12 @@
             <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
             <line x1="12" y1="19" x2="12" y2="22"></line>
           </svg>
-          MOTOR:
+          MOTOR TTS:
         </label>
         <select id="ttsEngineSelect" class="hud-select">
+          <option value="cosyvoice" selected>CosyVoice 3 (Alibaba FunAudioLLM)</option>
           <option value="edge">Microsoft Neural (Edge-TTS)</option>
-          <option value="piper">Piper TTS (Local Docker)</option>
-          <option value="cosyvoice">CosyVoice 3 (Alibaba FunAudioLLM)</option>
+          <option value="piper">Piper TTS (100% Local Docker)</option>
           <option value="chatterbox">Chatterbox TTS (Local Neural)</option>
         </select>
       </div>
@@ -93,7 +94,7 @@
           VOZ:
         </label>
         <select id="ttsVoiceSelect" class="hud-select">
-          <!-- Opciones dinámicas -->
+          <!-- Opciones dinámicas cargadas por app.js -->
         </select>
       </div>
 
@@ -102,14 +103,14 @@
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polyline>
           </svg>
-          VELOCIDAD: <span id="ttsRateDisplay">+20%</span>
+          VELOCIDAD: <span id="ttsRateDisplay">+30%</span>
         </label>
-        <input type="range" id="ttsRateSlider" min="-20" max="50" step="5" value="20" class="hud-slider">
+        <input type="range" id="ttsRateSlider" min="-20" max="50" step="5" value="30" class="hud-slider">
       </div>
 
       <div class="voice-toolbar-badge" id="ttsEngineBadge">
         <span class="badge-dot"></span>
-        <span id="ttsEngineBadgeText">EDGE NEURAL // DALIA</span>
+        <span id="ttsEngineBadgeText">COSYVOICE 3 // EMOCIONAL</span>
       </div>
     </div>
 
@@ -118,33 +119,33 @@
       <!-- Columna Izquierda: Reactor Central y Visualizador -->
       <section class="hud-card core-section">
         <div class="card-header">
-          <span class="card-tag">CORE // AUDIO REACTIVE ENGINE</span>
+          <span class="card-tag">ARC REACTOR // QUANTUM VOICE CORE</span>
           <span class="card-status-badge" id="coreStateBadge">STANDBY</span>
         </div>
 
-        <!-- Reactor Holográfico Central -->
+        <!-- Reactor Holográfico Central (Jarvis Arc Reactor Style) -->
         <div class="reactor-wrapper">
-          <!-- Anillos Giratorios Externos -->
+          <!-- Anillos Giratorios Externos con Resplandor Rosa y Cian -->
           <div class="hud-ring ring-outer"></div>
           <div class="hud-ring ring-middle"></div>
           <div class="hud-ring ring-inner"></div>
+          <div class="hud-ring ring-ticks"></div>
 
           <!-- Canvas para Ondas de Audio en Tiempo Real -->
-          <canvas id="visualizerCanvas" class="visualizer-canvas" width="280" height="280"></canvas>
+          <canvas id="visualizerCanvas" class="visualizer-canvas" width="300" height="300"></canvas>
 
-          <!-- Núcleo Central Interactivo -->
+          <!-- Núcleo Central Interactivo con efecto Arc Reactor -->
           <div class="core-center" id="voiceCoreBtn" title="Presiona o mantén para hablar con EVI">
             <div class="core-spider-logo">
               <svg viewBox="0 0 100 100" class="spider-svg">
-                <!-- Geometría Táctica Spider / AI -->
                 <circle cx="50" cy="50" r="44" stroke="currentColor" stroke-width="1.5" fill="none" stroke-dasharray="4 6" />
-                <polygon points="50,16 64,28 64,72 50,84 36,72 36,28" fill="rgba(0, 240, 255, 0.15)" stroke="currentColor" stroke-width="2"/>
-                <circle cx="50" cy="50" r="16" fill="url(#coreGlow)" stroke="currentColor" stroke-width="2"/>
+                <polygon points="50,14 66,28 66,72 50,86 34,72 34,28" fill="rgba(255, 0, 127, 0.18)" stroke="currentColor" stroke-width="2"/>
+                <circle cx="50" cy="50" r="16" fill="url(#coreGlowPink)" stroke="currentColor" stroke-width="2"/>
                 <defs>
-                  <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.9"/>
-                    <stop offset="80%" stop-color="#8b5cf6" stop-opacity="0.4"/>
-                    <stop offset="100%" stop-color="#ff2a5f" stop-opacity="0.1"/>
+                  <radialGradient id="coreGlowPink" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#ff007f" stop-opacity="0.95"/>
+                    <stop offset="70%" stop-color="#8b5cf6" stop-opacity="0.6"/>
+                    <stop offset="100%" stop-color="#00f0ff" stop-opacity="0.2"/>
                   </radialGradient>
                 </defs>
               </svg>
@@ -159,36 +160,23 @@
           <div class="voice-subtext" id="voiceSubtext">Micrófono permanente activado // Audio 16kHz PCM</div>
         </div>
 
-        <!-- Selector de Modo de Reconocimiento -->
-        <div class="stt-selector-deck">
-          <span class="deck-label">MOTOR STT:</span>
-          <label class="engine-toggle-label">
-            <input type="radio" name="sttMode" value="web" checked id="sttModeWeb">
-            <span class="toggle-chip">⚡ NATIVO BROWSER (INSTANTÁNEO)</span>
-          </label>
-          <label class="engine-toggle-label">
-            <input type="radio" name="sttMode" value="whisper" id="sttModeWhisper">
-            <span class="toggle-chip">🤖 FASTER-WHISPER (GPU CUDA)</span>
-          </label>
-        </div>
-
         <!-- Telemetría de Infraestructura Local -->
         <div class="telemetry-grid">
           <div class="telemetry-item">
             <span class="tel-label">GPU HARDWARE</span>
-            <span class="tel-val green">RTX 3060 CUDA</span>
+            <span class="tel-val pink">RTX 3060 CUDA</span>
           </div>
           <div class="telemetry-item">
             <span class="tel-label">LLM ENGINE</span>
-            <span class="tel-val cyan">QWEN3-8B @ 8080</span>
+            <span class="tel-val cyan">QWEN 14B / 8B</span>
           </div>
           <div class="telemetry-item">
             <span class="tel-label">TTS ENGINE</span>
-            <span class="tel-val purple">PIPER 22kHz @ 10200</span>
+            <span class="tel-val purple">COSYVOICE 3</span>
           </div>
           <div class="telemetry-item">
             <span class="tel-label">RAG VECTOR DB</span>
-            <span class="tel-val magenta">PGVECTOR 768-D</span>
+            <span class="tel-val magenta">PGVECTOR 1024-D</span>
           </div>
         </div>
       </section>
@@ -196,9 +184,9 @@
       <!-- Columna Derecha: Consola Táctica de Conversación -->
       <section class="hud-card stream-section">
         <div class="card-header">
-          <span class="card-tag">TRANSMISIÓN // DIÁLOGO EN TIEMPO REAL</span>
+          <span class="card-tag">HOLOGRAPHIC STREAM // DIÁLOGO TÁCTICO</span>
           <div class="header-actions">
-            <button class="btn-icon" id="clearStreamBtn" title="Limpiar historial">
+            <button class="btn-icon-cyber" id="clearStreamBtn" title="Limpiar historial de pantalla">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -213,25 +201,25 @@
             <div class="msg-avatar">EVI</div>
             <div class="msg-content">
               <div class="msg-sender">E.V.I. <span class="msg-time" id="initTime"></span></div>
-              <div class="msg-text">Hola Cristian. Todos los sistemas locales están operativos en tu RTX 3060. Puedes hablarme o escribir cuando gustes. ¿En qué trabajamos hoy, Señor?</div>
+              <div class="msg-text">Todos los sistemas locales están operativos en tu RTX 3060. Puedes hablarme o escribir cuando gustes. ¿Qué podemos hacer hoy?</div>
             </div>
           </div>
         </div>
 
-        <!-- Chips de Comandos Rápidos -->
+        <!-- Chips de Comandos Rápidos con Estilo Cyberpunk -->
         <div class="quick-chips-bar">
-          <button class="chip-btn" data-query="¿Cómo te llamas y quién te creó?">¿Quién eres?</button>
-          <button class="chip-btn" data-query="¿Cómo están los recursos del sistema y hardware?">Estado GPU/RAM</button>
-          <button class="chip-btn" data-query="¿Qué recuerdas sobre mí y mis preferencias?">Mis Preferencias</button>
-          <button class="chip-btn" data-query="Sube el volumen del sistema">Sube volumen</button>
-          <button class="chip-btn" data-query="Pon música lo-fi para programar en YouTube">Música Lo-Fi</button>
+          <button class="chip-btn-cyber" data-query="¿Cómo está el clima hoy en Lima?">🌦️ Clima en Lima</button>
+          <button class="chip-btn-cyber" data-query="¿Cómo están los recursos del sistema y hardware?">⚡ Estado GPU / RAM</button>
+          <button class="chip-btn-cyber" data-query="Pon música para programar en YouTube">🎵 Música en YouTube</button>
+          <button class="chip-btn-cyber" data-query="Sube el volumen al 50%">🔊 Volumen 50%</button>
+          <button class="chip-btn-cyber" data-query="¿Qué recuerdas sobre mí y mis preferencias?">🧠 Mis Preferencias</button>
         </div>
 
         <!-- Input Deck Bar -->
         <div class="input-deck">
           <div class="input-wrapper">
-            <input type="text" id="queryInput" placeholder="Escribe tu comando o pregunta para EVI..." autocomplete="off" />
-            <button class="send-btn" id="sendTextBtn" title="Enviar comando [Enter]">
+            <input type="text" id="queryInput" placeholder="Escribe tu comando o consulta para EVI..." autocomplete="off" />
+            <button class="send-btn-cyber" id="sendTextBtn" title="Enviar comando [Enter]">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="22" y1="2" x2="11" y2="13"></line>
                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -239,8 +227,8 @@
             </button>
           </div>
           <div class="keyboard-hints">
-            <span>[ESPACIO] Mantener para hablar</span>
-            <span>[ENTER] Enviar mensaje</span>
+            <span><kbd>ESPACIO</kbd> Mantener para hablar</span>
+            <span><kbd>ENTER</kbd> Enviar</span>
           </div>
         </div>
       </section>
@@ -249,22 +237,37 @@
 
   <!-- Modal de Gestión de Memorias y RAG -->
   <div class="hud-modal" id="memoryModal">
-    <div class="modal-backdrop" id="closeModalBackdrop"></div>
+    <div class="modal-overlay" id="modalOverlay"></div>
     <div class="modal-card">
       <div class="modal-header">
-        <h2>BASE DE MEMORIA Y CONOCIMIENTO RAG</h2>
-        <button class="btn-icon" id="closeModalBtn">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="modal-form-group">
-          <label>🧠 Guardar Nueva Memoria Episódica</label>
-          <input type="text" id="memoryTextInput" placeholder="Ej: Mi proyecto principal se llama EVI..." />
-          <button class="hud-btn-primary" id="saveMemoryActionBtn">GUARDAR EN PGVECTOR</button>
+        <div class="modal-title">
+          <span class="hud-corner top-left"></span>
+          <span class="hud-corner bottom-right"></span>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 15h-2v-6h2zm0-8h-2V7h2z"/>
+          </svg>
+          <span>BASE DE CONOCIMIENTO & MEMORIAS PERSISTENTES</span>
         </div>
-        <div class="modal-form-group" style="margin-top: 1.5rem;">
-          <label>📚 Indexar Documento de Conocimiento Técnico</label>
-          <textarea id="knowledgeTextInput" rows="3" placeholder="Ej: La base de datos corre en puerto 5432 con usuario postgres..."></textarea>
-          <button class="hud-btn-primary" id="saveKnowledgeActionBtn">INDEXAR CONOCIMIENTO</button>
+        <button class="modal-close-btn" id="closeModalBtn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="memory-form">
+          <label class="form-label">AGREGAR NUEVO HECHO O PREFERENCIA:</label>
+          <div class="form-row">
+            <input type="text" id="newMemoryInput" placeholder="Ej: Mi framework favorito es NestJS con TypeScript..." />
+            <button class="hud-btn-cyber pink" id="saveMemoryBtn">GUARDAR</button>
+          </div>
+        </div>
+
+        <div class="memory-list-section">
+          <div class="list-header">
+            <span class="list-title">MEMORIAS ALMACENADAS EN POSTGRESQL (PGVECTOR)</span>
+            <button class="refresh-link" id="refreshMemoriesBtn">ACTUALIZAR</button>
+          </div>
+          <div class="memory-items-container" id="memoryItemsContainer">
+            <div class="loading-placeholder">Cargando memorias vectoriales...</div>
+          </div>
         </div>
       </div>
     </div>
