@@ -78,7 +78,27 @@ export class GoogleMcpService {
       }
 
       const data = await response.json();
-      const outputText = data.output_text || data.choices?.[0]?.message?.content || (typeof data === 'string' ? data : JSON.stringify(data));
+      let outputText = data.output_text;
+
+      if (!outputText && Array.isArray(data.output)) {
+        const assistantMsg = data.output.find((item: any) => item.type === 'message' && item.role === 'assistant');
+        if (assistantMsg && Array.isArray(assistantMsg.content)) {
+          const textObj = assistantMsg.content.find((c: any) => c.type === 'output_text' || typeof c.text === 'string');
+          if (textObj) {
+            outputText = textObj.text;
+          }
+        }
+      }
+
+      if (!outputText && data.choices?.[0]?.message?.content) {
+        outputText = data.choices[0].message.content;
+      }
+
+      if (!outputText) {
+        outputText = typeof data === 'string' ? data : JSON.stringify(data);
+      }
+
+      this.logger.log(`✅ [GROQ MCP GMAIL]: Resumen obtenido (${outputText.length} caracteres).`);
 
       return {
         success: true,
@@ -147,7 +167,25 @@ export class GoogleMcpService {
       }
 
       const data = await response.json();
-      const outputText = data.output_text || data.choices?.[0]?.message?.content || JSON.stringify(data);
+      let outputText = data.output_text;
+
+      if (!outputText && Array.isArray(data.output)) {
+        const assistantMsg = data.output.find((item: any) => item.type === 'message' && item.role === 'assistant');
+        if (assistantMsg && Array.isArray(assistantMsg.content)) {
+          const textObj = assistantMsg.content.find((c: any) => c.type === 'output_text' || typeof c.text === 'string');
+          if (textObj) {
+            outputText = textObj.text;
+          }
+        }
+      }
+
+      if (!outputText && data.choices?.[0]?.message?.content) {
+        outputText = data.choices[0].message.content;
+      }
+
+      if (!outputText) {
+        outputText = typeof data === 'string' ? data : JSON.stringify(data);
+      }
 
       return {
         success: true,
@@ -206,7 +244,25 @@ export class GoogleMcpService {
       });
 
       const data = await response.json();
-      const outputText = data.output_text || data.choices?.[0]?.message?.content || JSON.stringify(data);
+      let outputText = data.output_text;
+
+      if (!outputText && Array.isArray(data.output)) {
+        const assistantMsg = data.output.find((item: any) => item.type === 'message' && item.role === 'assistant');
+        if (assistantMsg && Array.isArray(assistantMsg.content)) {
+          const textObj = assistantMsg.content.find((c: any) => c.type === 'output_text' || typeof c.text === 'string');
+          if (textObj) {
+            outputText = textObj.text;
+          }
+        }
+      }
+
+      if (!outputText && data.choices?.[0]?.message?.content) {
+        outputText = data.choices[0].message.content;
+      }
+
+      if (!outputText) {
+        outputText = typeof data === 'string' ? data : JSON.stringify(data);
+      }
 
       return {
         success: response.ok,
