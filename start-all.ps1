@@ -1,10 +1,13 @@
 # =====================================================================
-#             Script Inteligente de Arranque del Ecosistema EVI
+#             Script de Arranque E.V.I. (Modo Cloud & MCP)
 # =====================================================================
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 Write-Host "=================================================" -ForegroundColor Cyan
-Write-Host "        INICIANDO ECOSISTEMA LOCAL E.V.I.        " -ForegroundColor Cyan
+Write-Host "       INICIANDO E.V.I. (CLOUD HYPER-DRIVE)      " -ForegroundColor Magenta
+Write-Host "   ⚡ LLM: Groq (GPT-OSS 20B) // 800 Tokens/sec  " -ForegroundColor Cyan
+Write-Host "   🎙️ TTS: Microsoft Neural // Camila (Perú) +20%" -ForegroundColor Yellow
+Write-Host "   ✉️ MCP: Google Workspace // Gmail & Calendar   " -ForegroundColor Green
 Write-Host "=================================================" -ForegroundColor Cyan
 
 # Funcion para verificar si un puerto TCP esta abierto
@@ -26,80 +29,26 @@ function Test-PortOpen ($port) {
 }
 
 # -------------------------------------------------------------
-# 1. Verificar y levantar Contenedores Docker
+# 1. Base de Datos Vectorial (Opcional si Docker está disponible)
 # -------------------------------------------------------------
-Write-Host "`n[1/4] Verificando Contenedores Docker..." -ForegroundColor Yellow
-$requiredContainers = @("jarvis-whisper", "jarvis-piper", "jarvis-postgres-db", "jarvis-wakeword")
-$runningContainers = docker ps --format "{{.Names}}" 2>$null
-
-$missingContainers = @()
-foreach ($c in $requiredContainers) {
-    if ($runningContainers -notcontains $c) {
-        $missingContainers += $c
+$dockerRunning = docker info 2>$null
+if ($dockerRunning) {
+    $pgRunning = docker ps --filter "name=jarvis-postgres-db" --format "{{.Names}}" 2>$null
+    if ($pgRunning) {
+        Write-Host "`n[1/2] Base de Datos PostgreSQL pgvector activa." -ForegroundColor Green
+    } else {
+        Write-Host "`n[1/2] Iniciando contenedor de memoria PostgreSQL pgvector..." -ForegroundColor Cyan
+        docker compose up -d postgres-vector 2>$null
     }
-}
-
-if ($missingContainers.Count -eq 0) {
-    Write-Host "  [OK] Todos los contenedores Docker ya estan en ejecucion." -ForegroundColor Green
 } else {
-    $missingList = $missingContainers -join ", "
-    Write-Host "  [+] Levantando servicios Docker necesarios: $missingList" -ForegroundColor Cyan
-    docker compose up -d
-    Start-Sleep -Milliseconds 800
+    Write-Host "`n[1/2] Docker no detectado; continuando con memoria local en sesión..." -ForegroundColor Yellow
 }
 
 # -------------------------------------------------------------
-# 2. Verificar y levantar Servidor LLM Principal (Puerto 8080)
+# 2. Verificar y levantar Orquestador NestJS (Puerto 3000)
 # -------------------------------------------------------------
-Write-Host "`n[2/4] Verificando Servidor LLM - Qwen3-8B - puerto 8080..." -ForegroundColor Yellow
-if (Test-PortOpen 8080) {
-    Write-Host "  [OK] Servidor LLM puerto 8080 ya esta activo. Omitiendo arranque." -ForegroundColor Green
-} else {
-    Write-Host "  [+] Iniciando Servidor LLM en ventana independiente..." -ForegroundColor Cyan
-    Start-Process powershell -ArgumentList "-NoExit", "-File", "$PSScriptRoot\start-llm.ps1"
-    Start-Sleep -Milliseconds 600
-}
+Write-Host "`n[2/2] Iniciando Orquestador NestJS & Cockpit..." -ForegroundColor Yellow
 
-# -------------------------------------------------------------
-# 3. Verificar y levantar Servidor de Embeddings (Puerto 8081)
-# -------------------------------------------------------------
-Write-Host "`n[3/6] Verificando Servidor de Embeddings - puerto 8081..." -ForegroundColor Yellow
-if (Test-PortOpen 8081) {
-    Write-Host "  [OK] Servidor de Embeddings puerto 8081 ya esta activo. Omitiendo arranque." -ForegroundColor Green
-} else {
-    Write-Host "  [+] Iniciando Servidor de Embeddings en ventana independiente..." -ForegroundColor Cyan
-    Start-Process powershell -ArgumentList "-NoExit", "-File", "$PSScriptRoot\start-embeddings.ps1"
-    Start-Sleep -Milliseconds 600
-}
-
-# -------------------------------------------------------------
-# 4. Verificar y levantar Microservicio CosyVoice 3 (Puerto 50000)
-# -------------------------------------------------------------
-Write-Host "`n[4/6] Verificando Servidor CosyVoice 3 - puerto 50000..." -ForegroundColor Yellow
-if (Test-PortOpen 50000) {
-    Write-Host "  [OK] Servidor CosyVoice 3 puerto 50000 ya esta activo. Omitiendo arranque." -ForegroundColor Green
-} else {
-    Write-Host "  [+] Iniciando Servidor CosyVoice 3 en ventana independiente..." -ForegroundColor Cyan
-    Start-Process powershell -ArgumentList "-NoExit", "-File", "$PSScriptRoot\start-cosyvoice.ps1"
-    Start-Sleep -Milliseconds 600
-}
-
-# -------------------------------------------------------------
-# 5. Verificar y levantar Native Faster-Whisper CUDA (Puerto 10305)
-# -------------------------------------------------------------
-Write-Host "`n[5/6] Verificando Servidor Faster-Whisper CUDA - puerto 10305..." -ForegroundColor Yellow
-if (Test-PortOpen 10305) {
-    Write-Host "  [OK] Servidor Faster-Whisper CUDA puerto 10305 ya esta activo. Omitiendo arranque." -ForegroundColor Green
-} else {
-    Write-Host "  [+] Iniciando Servidor Faster-Whisper CUDA en ventana independiente..." -ForegroundColor Cyan
-    Start-Process powershell -ArgumentList "-NoExit", "-File", "$PSScriptRoot\start-whisper.ps1"
-    Start-Sleep -Milliseconds 600
-}
-
-# -------------------------------------------------------------
-# 6. Verificar y levantar Orquestador NestJS (Puerto 3000)
-# -------------------------------------------------------------
-Write-Host "`n[6/6] Verificando Backend Orquestador NestJS - puerto 3000..." -ForegroundColor Yellow
 if (Test-PortOpen 3000) {
     Write-Host "  [OK] El Orquestador NestJS ya esta activo en puerto 3000." -ForegroundColor Green
     Write-Host "`n=================================================" -ForegroundColor Cyan
