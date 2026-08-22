@@ -10,11 +10,11 @@ export class TtsService {
   private readonly logger = new Logger(TtsService.name);
   private readonly providers: Map<TtsEngineType, ITtsProvider> = new Map();
 
-  // Configuración activa por defecto: CosyVoice 3 Emocional / Táctico (F)
+  // Configuración activa por defecto: Microsoft Neural (Edge-TTS) Dalia / Camila (Instantánea y Gratuita)
   private currentConfig: TtsConfig = {
-    engine: (process.env.TTS_DEFAULT_ENGINE as TtsEngineType) || 'cosyvoice',
-    voice: process.env.TTS_DEFAULT_VOICE || 'cosy-es-expressive',
-    rate: process.env.TTS_DEFAULT_RATE || '+30%',
+    engine: (process.env.TTS_DEFAULT_ENGINE as TtsEngineType) || 'edge',
+    voice: process.env.TTS_DEFAULT_VOICE || 'es-MX-DaliaNeural',
+    rate: process.env.TTS_DEFAULT_RATE || '+20%',
   };
 
   constructor(
