@@ -22,7 +22,8 @@ import { WeatherService } from './weather.service';
 })
 export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(JarvisGateway.name);
-  private readonly SESSION_ID = 'evi_main';
+  private readonly SESSION_ID = 'cristian-desktop-session';
+  private activeAbortControllers: Map<string, AbortController> = new Map();
 
   constructor(
     private readonly llmService: LlmService,
@@ -46,6 +47,24 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
+    const controller = this.activeAbortControllers.get(client.id);
+    if (controller) {
+      controller.abort();
+      this.activeAbortControllers.delete(client.id);
+    }
+  }
+
+  @SubscribeMessage('interrupt')
+  handleInterrupt(@ConnectedSocket() client: Socket) {
+    const controller = this.activeAbortControllers.get(client.id);
+    if (controller) {
+      controller.abort();
+      this.activeAbortControllers.delete(client.id);
+      this.logger.log(`🛑 [USER INTERRUPT]: Generation cancelled by client ${client.id}`);
+    }
+    client.emit('interrupted');
+    client.emit('response_finished');
+    return { success: true };
   }
 
   @SubscribeMessage('get_tts_catalog')
@@ -91,6 +110,16 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
+    // Cancelar cualquier generación anterior si el usuario interrumpe con una nueva orden
+    const prevController = this.activeAbortControllers.get(client.id);
+    if (prevController) {
+      prevController.abort();
+      this.activeAbortControllers.delete(client.id);
+    }
+
+    const abortController = new AbortController();
+    this.activeAbortControllers.set(client.id, abortController);
+
     this.logger.log(`\n========================================\n📥 [USER QUERY RECEIVED]: "${queryText}"`);
 
     // 1. Verificar si es una orden directa del sistema operativo (Windows Actions)
@@ -107,6 +136,8 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.error(`❌ [ACTION FAILED]: ${actErr.message}`);
     }
 
+    if (abortController.signal.aborted) return;
+
     // 2. Si no es una acción de Windows, verificar si es una consulta de clima en tiempo real
     if (!actionResultContext) {
       try {
@@ -120,19 +151,22 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
     }
 
+    if (abortController.signal.aborted) return;
+
     // 2. Retrieve RAG context & memories in parallel
     const [knowledge, memories] = await Promise.all([
       this.ragService.searchKnowledge(queryText).catch(() => []),
       this.ragService.searchMemories(queryText).catch(() => []),
     ]);
 
+    if (abortController.signal.aborted) return;
+
     // 3. Cargar historial de conversación persistido desde PostgreSQL
     const clientHistory = await this.ragService.loadConversationHistory(this.SESSION_ID, 12);
 
+    if (abortController.signal.aborted) return;
+
     // 4. Stream tokens con pipeline paralelo de TTS en tiempo real
-    //    - Umbral agresivo: primera frase se despacha con apenas 10 chars + puntuación
-    //    - Comas siempre cortan para mantener la latencia baja
-    //    - Pre-fetch: se sintetiza el siguiente chunk MIENTRAS el actual se emite
     let sentenceBuffer = '';
     let fullAssistantResponse = '';
     let chunkIndex = 0;
@@ -142,6 +176,7 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
     let emitQueue = Promise.resolve();
 
     const dispatchAudioChunk = (sentence: string) => {
+      if (abortController.signal.aborted) return;
       const cleanSentence = sentence.trim();
       if (cleanSentence.length < 2) return;
 
@@ -160,8 +195,9 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // Emitir en orden FIFO estricto, pero la síntesis ya corre en paralelo
       emitQueue = emitQueue.then(async () => {
+        if (abortController.signal.aborted) return;
         const result = await synthesisPromise;
-        if (result.audio && result.audio.length > 0) {
+        if (result.audio && result.audio.length > 0 && !abortController.signal.aborted) {
           this.logger.log(`🔊 [TTS #${result.idx}] (${result.audio.length} bytes) -> "${result.text}"`);
           client.emit('audio_chunk', result.audio.toString('base64'));
         }
@@ -174,53 +210,65 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
       memories,
       actionResultContext,
       clientHistory,
+      abortController.signal,
     );
 
-    for await (const token of stream) {
-      sentenceBuffer += token;
-      fullAssistantResponse += token;
-      client.emit('text_token', token);
+    try {
+      for await (const token of stream) {
+        if (abortController.signal.aborted) {
+          this.logger.log(`🛑 [STREAM ABORTED]: Response loop stopped.`);
+          break;
+        }
 
-      const isFirst = chunkIndex === 0;
+        sentenceBuffer += token;
+        fullAssistantResponse += token;
+        client.emit('text_token', token);
 
-      // 1. Fin de oración fuerte (. ? ! : \n)
-      const majorRegex = /([:.?!\n]+)/;
-      const majorMatch = majorRegex.exec(sentenceBuffer);
+        const isFirst = chunkIndex === 0;
 
-      if (majorMatch && sentenceBuffer.length >= (isFirst ? 20 : 30)) {
-        const sentenceEndIndex = majorMatch.index + majorMatch[0].length;
-        const completeSentence = sentenceBuffer.substring(0, sentenceEndIndex).trim();
-        sentenceBuffer = sentenceBuffer.substring(sentenceEndIndex);
-        dispatchAudioChunk(completeSentence);
-      } else if (sentenceBuffer.length >= (isFirst ? 25 : 50)) {
-        // 2. Comas (,) solo si la frase acumulada ya tiene cuerpo completo
-        const commaRegex = /([,;]+)/;
-        const commaMatch = commaRegex.exec(sentenceBuffer);
-        if (commaMatch) {
-          const sentenceEndIndex = commaMatch.index + commaMatch[0].length;
+        // 1. Fin de oración fuerte (. ? ! : \n)
+        const majorRegex = /([:.?!\n]+)/;
+        const majorMatch = majorRegex.exec(sentenceBuffer);
+
+        if (majorMatch && sentenceBuffer.length >= (isFirst ? 20 : 30)) {
+          const sentenceEndIndex = majorMatch.index + majorMatch[0].length;
           const completeSentence = sentenceBuffer.substring(0, sentenceEndIndex).trim();
           sentenceBuffer = sentenceBuffer.substring(sentenceEndIndex);
           dispatchAudioChunk(completeSentence);
+        } else if (sentenceBuffer.length >= (isFirst ? 25 : 50)) {
+          // 2. Comas (,) solo si la frase acumulada ya tiene cuerpo completo
+          const commaRegex = /([,;]+)/;
+          const commaMatch = commaRegex.exec(sentenceBuffer);
+          if (commaMatch) {
+            const sentenceEndIndex = commaMatch.index + commaMatch[0].length;
+            const completeSentence = sentenceBuffer.substring(0, sentenceEndIndex).trim();
+            sentenceBuffer = sentenceBuffer.substring(sentenceEndIndex);
+            dispatchAudioChunk(completeSentence);
+          }
         }
       }
+
+      // Procesar cualquier remanente del buffer si no fue abortado
+      if (!abortController.signal.aborted && sentenceBuffer.trim().length >= 2) {
+        dispatchAudioChunk(sentenceBuffer.trim());
+      }
+
+      // Esperar a que toda la cola de emisión termine
+      await emitQueue;
+    } catch (streamErr) {
+      this.logger.warn(`Stream loop interrupted: ${streamErr.message}`);
     }
 
-    // Procesar cualquier remanente del buffer
-    if (sentenceBuffer.trim().length >= 2) {
-      dispatchAudioChunk(sentenceBuffer.trim());
+    if (!abortController.signal.aborted) {
+      // 5. Persistir turnos de conversación en PostgreSQL
+      await this.ragService.saveConversationTurn(this.SESSION_ID, 'user', queryText);
+      if (fullAssistantResponse.trim()) {
+        await this.ragService.saveConversationTurn(this.SESSION_ID, 'assistant', fullAssistantResponse.trim());
+      }
+      client.emit('response_finished');
     }
 
-    // Esperar a que toda la cola de emisión en orden termine
-    await emitQueue;
-
-    // 5. Persistir turnos de conversación en PostgreSQL
-    await this.ragService.saveConversationTurn(this.SESSION_ID, 'user', queryText);
-    if (fullAssistantResponse.trim()) {
-      await this.ragService.saveConversationTurn(this.SESSION_ID, 'assistant', fullAssistantResponse.trim());
-    }
-
-    // Notify client that response generation finished
-    client.emit('response_finished');
+    this.activeAbortControllers.delete(client.id);
   }
 
   /**

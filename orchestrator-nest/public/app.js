@@ -196,9 +196,25 @@ function setCoreState(state) {
 const audioPlaybackQueue = [];
 let isPlayingAudio = false;
 
+let currentPlayingAudio = null;
+
+function stopAndInterruptPlayback() {
+  if (currentPlayingAudio) {
+    try {
+      currentPlayingAudio.pause();
+      currentPlayingAudio.currentTime = 0;
+    } catch (e) {}
+    currentPlayingAudio = null;
+  }
+  audioPlaybackQueue.length = 0;
+  isPlayingAudio = false;
+  socket.emit('interrupt');
+}
+
 function playNextAudioChunk() {
   if (audioPlaybackQueue.length === 0) {
     isPlayingAudio = false;
+    currentPlayingAudio = null;
     if (currentCoreState === 'SPEAKING') {
       setCoreState('STANDBY');
     }
@@ -228,21 +244,25 @@ function playNextAudioChunk() {
     const audioBlob = new Blob([bytes.buffer], { type: mimeType });
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
+    currentPlayingAudio = audio;
 
     audio.onended = () => {
       URL.revokeObjectURL(audioUrl);
+      if (currentPlayingAudio === audio) currentPlayingAudio = null;
       playNextAudioChunk();
     };
 
     audio.onerror = (e) => {
       console.warn('Audio element playback error:', e);
       URL.revokeObjectURL(audioUrl);
+      if (currentPlayingAudio === audio) currentPlayingAudio = null;
       playNextAudioChunk();
     };
 
     audio.play().catch((err) => {
       console.warn('Audio play error:', err);
       URL.revokeObjectURL(audioUrl);
+      if (currentPlayingAudio === audio) currentPlayingAudio = null;
       playNextAudioChunk();
     });
   } catch (err) {
@@ -501,6 +521,7 @@ if (SpeechRecognition) {
 }
 
 function startVoiceCapture() {
+  stopAndInterruptPlayback();
   initAudioContext();
   isRecording = true;
   setCoreState('LISTENING');
@@ -530,7 +551,11 @@ function stopVoiceCapture() {
 }
 
 voiceCoreBtn.addEventListener('click', () => {
-  if (!isRecording) {
+  if (currentCoreState === 'SPEAKING' || isPlayingAudio) {
+    // Si EVI está hablando, el clic la interrumpe inmediatamente y abre el micrófono
+    stopAndInterruptPlayback();
+    startVoiceCapture();
+  } else if (!isRecording) {
     startVoiceCapture();
   } else {
     stopVoiceCapture();
@@ -541,6 +566,7 @@ voiceCoreBtn.addEventListener('click', () => {
 // Text Messaging & Keyboard Shortcuts
 // =====================================================================
 function sendTextMessage(text) {
+  stopAndInterruptPlayback();
   const query = (text || queryInput.value).trim();
   if (!query) return;
 

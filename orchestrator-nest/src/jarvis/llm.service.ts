@@ -88,6 +88,7 @@ export class LlmService {
     memoriesContext: string[] = [],
     actionContext?: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+    abortSignal?: AbortSignal,
   ): AsyncGenerator<string, void, unknown> {
     const now = new Date();
     const currentTimeStr = now.toLocaleTimeString('es-PE', {
@@ -162,16 +163,19 @@ EJEMPLOS DE RESPUESTAS CORRECTAS:
 
     try {
       this.logger.log(`Invoking LLM [${this.activeProvider}] -> Model: ${modelToUse}...`);
-      const stream = await clientToUse.chat.completions.create({
-        model: modelToUse,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...formattedHistory,
-          { role: 'user', content: userQuery },
-        ],
-        stream: true,
-        temperature: 0.4,
-      });
+      const stream = await clientToUse.chat.completions.create(
+        {
+          model: modelToUse,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...formattedHistory,
+            { role: 'user', content: userQuery },
+          ],
+          stream: true,
+          temperature: 0.4,
+        },
+        { signal: abortSignal },
+      );
 
       let inThinkTag = false;
       let tokenBuffer = '';

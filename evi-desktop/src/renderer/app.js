@@ -319,14 +319,29 @@ function setCoreState(state) {
 }
 
 // =====================================================================
-// Audio Playback Queue (FIFO Chronological Stream)
+// Audio Playback Queue (FIFO Chronological Stream with Barge-in)
 // =====================================================================
 const audioPlaybackQueue = [];
 let isPlayingAudio = false;
+let currentPlayingAudio = null;
+
+function stopAndInterruptPlayback() {
+  if (currentPlayingAudio) {
+    try {
+      currentPlayingAudio.pause();
+      currentPlayingAudio.currentTime = 0;
+    } catch (e) {}
+    currentPlayingAudio = null;
+  }
+  audioPlaybackQueue.length = 0;
+  isPlayingAudio = false;
+  socket.emit('interrupt');
+}
 
 function playNextAudioChunk() {
   if (audioPlaybackQueue.length === 0) {
     isPlayingAudio = false;
+    currentPlayingAudio = null;
     if (currentCoreState === 'SPEAKING') {
       setCoreState('STANDBY');
     }
@@ -356,21 +371,25 @@ function playNextAudioChunk() {
     const audioBlob = new Blob([bytes.buffer], { type: mimeType });
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
+    currentPlayingAudio = audio;
 
     audio.onended = () => {
       URL.revokeObjectURL(audioUrl);
+      if (currentPlayingAudio === audio) currentPlayingAudio = null;
       playNextAudioChunk();
     };
 
     audio.onerror = (e) => {
       console.warn('Audio element playback error:', e);
       URL.revokeObjectURL(audioUrl);
+      if (currentPlayingAudio === audio) currentPlayingAudio = null;
       playNextAudioChunk();
     };
 
     audio.play().catch((err) => {
       console.warn('Audio play error:', err);
       URL.revokeObjectURL(audioUrl);
+      if (currentPlayingAudio === audio) currentPlayingAudio = null;
       playNextAudioChunk();
     });
   } catch (err) {
@@ -605,6 +624,7 @@ let pcmProcessor = null;
 let recordedPcmChunks = [];
 
 async function startVoiceCapture() {
+  stopAndInterruptPlayback();
   if (isRecording) return;
   initAudioContext();
 
@@ -708,6 +728,8 @@ function export16BitPCM(samples, sampleRate, targetRate = 16000) {
 }
 
 function triggerWakeWordActivation() {
+  stopAndInterruptPlayback();
+
   // Play futuristic chime
   wakeChime.currentTime = 0;
   wakeChime.play().catch(() => {});
@@ -720,7 +742,10 @@ function triggerWakeWordActivation() {
 }
 
 voiceCoreBtn.addEventListener('click', () => {
-  if (!isRecording) {
+  if (currentCoreState === 'SPEAKING' || isPlayingAudio) {
+    stopAndInterruptPlayback();
+    startVoiceCapture();
+  } else if (!isRecording) {
     startVoiceCapture();
   } else {
     stopVoiceCapture();
@@ -731,6 +756,7 @@ voiceCoreBtn.addEventListener('click', () => {
 // Text Messaging & Keyboard Shortcuts
 // =========================================================
 function sendTextMessage(text) {
+  stopAndInterruptPlayback();
   const query = (text || queryInput.value).trim();
   if (!query) return;
 
