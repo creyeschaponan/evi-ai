@@ -252,10 +252,11 @@
 
         <!-- Chips de Comandos Rápidos -->
         <div class="quick-chips-bar">
+          <button class="chip-btn-cyber" data-query="EVI, ¿qué correos tengo hoy? Dame un resumen de los 5 más recientes">✉️ Mis Correos de Hoy</button>
+          <button class="chip-btn-cyber" data-query="EVI, ¿qué eventos o reuniones tengo en mi calendario hoy?">📅 Agenda de Hoy</button>
           <button class="chip-btn-cyber" data-query="¿Cómo está el clima hoy en Lima?">🌦️ Clima en Lima</button>
           <button class="chip-btn-cyber" data-query="¿Cómo están los recursos del sistema y hardware?">⚡ Estado GPU / RAM</button>
           <button class="chip-btn-cyber" data-query="Pon música para programar en YouTube">🎵 Música en YouTube</button>
-          <button class="chip-btn-cyber" data-query="Sube el volumen al 50%">🔊 Volumen 50%</button>
           <button class="chip-btn-cyber" data-query="¿Qué recuerdas sobre mí y mis preferencias?">🧠 Mis Preferencias</button>
         </div>
 
@@ -280,6 +281,29 @@
 
       <!-- FLANK DERECHO: Telemetría de Inteligencia Artificial y Pipeline -->
       <aside class="hud-flank flank-right">
+        <!-- Google Workspace MCP Widget -->
+        <div class="hud-widget">
+          <div class="widget-header">
+            <span class="widget-icon">✉️</span>
+            <span class="widget-title">GOOGLE WORKSPACE // MCP</span>
+            <span class="widget-badge green" id="googleWorkspaceBadge">CONECTADO</span>
+          </div>
+          <div class="widget-body">
+            <div class="metric-row">
+              <span class="metric-label">GMAIL MCP:</span>
+              <span class="metric-val cyan">connector_gmail</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">CALENDAR MCP:</span>
+              <span class="metric-val pink">connector_googlecalendar</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">GROQ RESPONSES:</span>
+              <span class="metric-val green">gpt-oss-120b</span>
+            </div>
+          </div>
+        </div>
+
         <!-- LLM Matrix Widget -->
         <div class="hud-widget">
           <div class="widget-header">

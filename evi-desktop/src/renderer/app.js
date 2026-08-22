@@ -652,6 +652,20 @@ socket.on('system_metrics', (m) => {
   }
 });
 
+// Google Workspace Status
+socket.on('google_workspace_status', (status) => {
+  const googleBadge = document.getElementById('googleWorkspaceBadge');
+  if (googleBadge) {
+    if (status && status.configured) {
+      googleBadge.textContent = 'CONECTADO';
+      googleBadge.className = 'widget-badge green';
+    } else {
+      googleBadge.textContent = 'SIN TOKEN';
+      googleBadge.className = 'widget-badge pink';
+    }
+  }
+});
+
 // =====================================================================
 // Dialogue UI Helpers (Max 2 Visible Subtitle Turns with Fade-Out)
 // =====================================================================

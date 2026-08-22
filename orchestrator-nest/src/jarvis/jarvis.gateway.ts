@@ -17,6 +17,8 @@ import { KnowledgeIngestService } from './knowledge-ingest.service';
 import { WindowsService } from './windows.service';
 import { WeatherService } from './weather.service';
 import { SystemMetricsService } from './system-metrics.service';
+import { GoogleMcpService } from './google-mcp.service';
+import { GoogleAuthService } from './google-auth.service';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -40,6 +42,8 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly windowsService: WindowsService,
     private readonly weatherService: WeatherService,
     private readonly metricsService: SystemMetricsService,
+    private readonly googleMcpService: GoogleMcpService,
+    private readonly googleAuth: GoogleAuthService,
   ) {
     this.metricsInterval = setInterval(() => {
       if (this.server) {
@@ -57,6 +61,7 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
       model: this.llmService.getActiveModel(),
     });
     client.emit('system_metrics', this.metricsService.getMetrics());
+    client.emit('google_workspace_status', { configured: this.googleAuth.isConfigured() });
   }
 
   handleDisconnect(client: Socket) {
@@ -68,13 +73,27 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  @SubscribeMessage('update_google_token')
+  handleUpdateGoogleToken(
+    @MessageBody() payload: { token: string; expiresIn?: number },
+    @ConnectedSocket() client: Socket,
+  ) {
+    if (payload?.token) {
+      this.googleAuth.setAccessToken(payload.token, payload.expiresIn || 3600);
+      client.emit('google_workspace_status', { configured: true });
+      this.logger.log(`Google Access Token actualizado desde cliente ${client.id}`);
+      return { success: true };
+    }
+    return { success: false };
+  }
+
   @SubscribeMessage('interrupt')
   handleInterrupt(@ConnectedSocket() client: Socket) {
     const controller = this.activeAbortControllers.get(client.id);
     if (controller) {
+      this.logger.log(`🛑 [BARGE-IN RECEIVED]: Client ${client.id} requested playback/generation cancellation.`);
       controller.abort();
       this.activeAbortControllers.delete(client.id);
-      this.logger.log(`🛑 [USER INTERRUPT]: Generation cancelled for client ${client.id}`);
     }
     client.emit('interrupted');
     return { success: true };
@@ -92,7 +111,7 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     const updated = this.ttsService.updateConfig(settings);
     client.emit('tts_config_updated', updated);
-    this.logger.log(`TTS Settings updated from client ${client.id}: Engine=[${updated.engine}], Voice=[${updated.voice}], Rate=[${updated.rate}]`);
+    this.logger.log(`TTS Settings updated: [${updated.engine}] Voice: [${updated.voice}] Rate: [${updated.rate}]`);
     return updated;
   }
 
@@ -161,6 +180,49 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
         }
       } catch (wErr) {
         this.logger.warn(`Could not retrieve weather context: ${wErr.message}`);
+      }
+    }
+
+    if (abortController.signal.aborted) return;
+
+    // 3. Verificar si es una consulta a Google Workspace (Gmail / Calendar) mediante MCP
+    if (!actionResultContext) {
+      const lowerQuery = queryText.toLowerCase();
+      const isGmailIntent =
+        lowerQuery.includes('correo') ||
+        lowerQuery.includes('gmail') ||
+        lowerQuery.includes('email') ||
+        lowerQuery.includes('bandeja') ||
+        lowerQuery.includes('inbox') ||
+        lowerQuery.includes('mensajes de hoy');
+
+      const isCalendarIntent =
+        lowerQuery.includes('calendario') ||
+        lowerQuery.includes('agenda') ||
+        lowerQuery.includes('reuniones') ||
+        lowerQuery.includes('citas hoy') ||
+        lowerQuery.includes('eventos de hoy');
+
+      if (isGmailIntent) {
+        this.logger.log(`📬 [GMAIL INTENT DETECTED]: Consultando Groq MCP Gmail Connector...`);
+        try {
+          const mcpResult = await this.googleMcpService.getRecentEmailsSummary(5, queryText);
+          if (mcpResult && mcpResult.text) {
+            actionResultContext = `[RESULTADO DE TU BANDEJA DE GMAIL VIA MCP]: ${mcpResult.text}`;
+          }
+        } catch (mcpErr: any) {
+          this.logger.warn(`Error en Google MCP Gmail: ${mcpErr.message}`);
+        }
+      } else if (isCalendarIntent) {
+        this.logger.log(`📅 [CALENDAR INTENT DETECTED]: Consultando Groq MCP Calendar Connector...`);
+        try {
+          const mcpResult = await this.googleMcpService.getTodayCalendarSummary();
+          if (mcpResult && mcpResult.text) {
+            actionResultContext = `[RESULTADO DE TU GOOGLE CALENDAR VIA MCP]: ${mcpResult.text}`;
+          }
+        } catch (mcpErr: any) {
+          this.logger.warn(`Error en Google MCP Calendar: ${mcpErr.message}`);
+        }
       }
     }
 

@@ -12,6 +12,8 @@ import { KnowledgeIngestService } from './knowledge-ingest.service';
 import { WindowsService } from './windows.service';
 import { WeatherService } from './weather.service';
 import { SystemMetricsService } from './system-metrics.service';
+import { GoogleAuthService } from './google-auth.service';
+import { GoogleMcpService } from './google-mcp.service';
 
 @Module({
   providers: [
@@ -28,6 +30,8 @@ import { SystemMetricsService } from './system-metrics.service';
     WindowsService,
     WeatherService,
     SystemMetricsService,
+    GoogleAuthService,
+    GoogleMcpService,
   ],
   exports: [
     LlmService,
@@ -42,6 +46,8 @@ import { SystemMetricsService } from './system-metrics.service';
     WindowsService,
     WeatherService,
     SystemMetricsService,
+    GoogleAuthService,
+    GoogleMcpService,
   ],
 })
 export class JarvisModule {}
