@@ -52,6 +52,8 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }, 2000);
   }
 
+  private acknowledgmentMode: 'static' | 'pre_llm' = 'pre_llm';
+
   handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
     // Enviar catálogo completo de motores TTS, configuración LLM y métricas iniciales
@@ -62,6 +64,7 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
     client.emit('system_metrics', this.metricsService.getMetrics());
     client.emit('google_workspace_status', { configured: this.googleAuth.isConfigured() });
+    client.emit('ack_mode', { mode: this.acknowledgmentMode });
   }
 
   handleDisconnect(client: Socket) {
@@ -71,6 +74,52 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
       controller.abort();
       this.activeAbortControllers.delete(client.id);
     }
+  }
+
+  @SubscribeMessage('update_ack_mode')
+  handleUpdateAckMode(
+    @MessageBody() payload: { mode: 'static' | 'pre_llm' },
+    @ConnectedSocket() client: Socket,
+  ) {
+    if (payload?.mode === 'static' || payload?.mode === 'pre_llm') {
+      this.acknowledgmentMode = payload.mode;
+      this.server.emit('ack_mode_updated', { mode: this.acknowledgmentMode });
+      this.logger.log(`Modo de Latency Masking cambiado a: [${this.acknowledgmentMode.toUpperCase()}]`);
+      return { mode: this.acknowledgmentMode };
+    }
+  }
+
+  private async getAckPhrase(queryText: string, category: 'gmail' | 'calendar' | 'windows' | 'rag'): Promise<string> {
+    if (this.acknowledgmentMode === 'pre_llm') {
+      const dynamicPhrase = await this.llmService.generateFastAck(queryText, category);
+      if (dynamicPhrase) return dynamicPhrase;
+    }
+
+    // Modo 1: Catálogo Estático Determinado (0ms)
+    const staticCatalogs: Record<string, string[]> = {
+      gmail: [
+        'Revisando tu bandeja de entrada en este momento...',
+        'Dame un segundo, estoy escaneando tus correos...',
+        'Accediendo a tu Gmail para verificar tus mensajes...',
+        'Consultando tu bandeja de correo, un momento...',
+      ],
+      calendar: [
+        'Revisando tu calendario de hoy, un momento...',
+        'Dame un segundo, verifico tu agenda y reuniones...',
+        'Accediendo a Google Calendar en este momento...',
+      ],
+      windows: [
+        'Ejecutando la orden en el sistema...',
+        'Aplicando la acción solicitada en Windows...',
+      ],
+      rag: [
+        'Buscando en la base de conocimientos...',
+        'Consultando tus archivos y memorias...',
+      ],
+    };
+
+    const list = staticCatalogs[category] || staticCatalogs.gmail;
+    return list[Math.floor(Math.random() * list.length)];
   }
 
   @SubscribeMessage('update_google_token')
@@ -207,13 +256,7 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
         lowerQuery.includes('eventos de hoy');
 
       if (isGmailIntent) {
-        const acks = [
-          'Revisando tu bandeja de entrada en este momento...',
-          'Dame un segundo, estoy escaneando tus correos...',
-          'Accediendo a tu Gmail para verificar tus mensajes...',
-          'Consultando tu bandeja de correo, un momento...',
-        ];
-        const ackPhrase = acks[Math.floor(Math.random() * acks.length)];
+        const ackPhrase = await this.getAckPhrase(queryText, 'gmail');
         initialAckText = ackPhrase;
 
         // Feedback visual inmediato en subtítulos
@@ -224,7 +267,7 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
           .synthesizeSentence(ackPhrase)
           .then((buf) => {
             if (buf && buf.length > 0 && !abortController.signal.aborted) {
-              this.logger.log(`🔊 [INSTANT ACK TTS] (${buf.length} bytes) -> "${ackPhrase}"`);
+              this.logger.log(`🔊 [INSTANT ACK TTS (${this.acknowledgmentMode.toUpperCase()})] (${buf.length} bytes) -> "${ackPhrase}"`);
               client.emit('audio_chunk', buf.toString('base64'));
             }
           })
@@ -243,12 +286,7 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
           this.logger.warn(`Error en Google MCP Gmail: ${mcpErr.message}`);
         }
       } else if (isCalendarIntent) {
-        const acks = [
-          'Revisando tu calendario de hoy, un momento...',
-          'Dame un segundo, verifico tu agenda y reuniones...',
-          'Accediendo a Google Calendar en este momento...',
-        ];
-        const ackPhrase = acks[Math.floor(Math.random() * acks.length)];
+        const ackPhrase = await this.getAckPhrase(queryText, 'calendar');
         initialAckText = ackPhrase;
 
         client.emit('text_token', ackPhrase + '\n\n');
@@ -257,7 +295,7 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
           .synthesizeSentence(ackPhrase)
           .then((buf) => {
             if (buf && buf.length > 0 && !abortController.signal.aborted) {
-              this.logger.log(`🔊 [INSTANT ACK TTS] (${buf.length} bytes) -> "${ackPhrase}"`);
+              this.logger.log(`🔊 [INSTANT ACK TTS (${this.acknowledgmentMode.toUpperCase()})] (${buf.length} bytes) -> "${ackPhrase}"`);
               client.emit('audio_chunk', buf.toString('base64'));
             }
           })

@@ -281,6 +281,28 @@
 
       <!-- FLANK DERECHO: Telemetría de Inteligencia Artificial y Pipeline -->
       <aside class="hud-flank flank-right">
+        <!-- Switch Selector de Aviso Previo (Latency Masking) -->
+        <div class="hud-widget ack-mode-widget">
+          <div class="widget-header">
+            <span class="widget-icon">⚡</span>
+            <span class="widget-title">AVISO PREVIO // LATENCY MASK</span>
+          </div>
+          <div class="widget-body">
+            <div class="ack-mode-toggle-group">
+              <button class="ack-mode-btn active" id="ackModePreLlmBtn" data-mode="pre_llm" title="Pre-LLM ultrarrápido dinámico (~50ms)">
+                🧠 PRE-LLM (~50ms)
+              </button>
+              <button class="ack-mode-btn" id="ackModeStaticBtn" data-mode="static" title="Catálogo estático táctico inmediato (0ms)">
+                ⚡ ESTÁTICO (0ms)
+              </button>
+            </div>
+            <div class="metric-row" style="margin-top: 8px;">
+              <span class="metric-label">MODO ACTIVO:</span>
+              <span class="metric-val cyan" id="ackModeLabel">PRE-LLM DINÁMICO</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Google Workspace MCP Widget -->
         <div class="hud-widget">
           <div class="widget-header">

@@ -87,6 +87,44 @@ export class LlmService {
     }
   }
 
+  /**
+   * Genera dinámicamente en ~50ms una frase de aviso/reconocimiento ultracorta (Forma 2: Pre-LLM)
+   */
+  async generateFastAck(userQuery: string, contextHint: string = 'acción o búsqueda'): Promise<string | null> {
+    const client = this.groqClient || this.geminiClient;
+    const model = this.groqClient ? 'openai/gpt-oss-20b' : 'gemini-2.0-flash';
+    if (!client) return null;
+
+    try {
+      const completion = await client.chat.completions.create({
+        model: model,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Eres EVI, asistente virtual táctica y femenina. Tu tarea es generar UNA SOLA FRASE de cortesía ultracorta (máximo 6 palabras) en español natural indicando de forma vivaz y elegante que estás realizando la acción o buscando la información solicitada por el usuario. ' +
+              'Ejemplos: "Revisando tus mensajes de hoy...", "Buscando en tus archivos ahora mismo...", "Consultando la información en este momento...", "Accediendo a tus datos de Gmail...". ' +
+              'Responde ÚNICAMENTE con la frase directa, sin introducciones, sin comillas y sin explicaciones.',
+          },
+          {
+            role: 'user',
+            content: `El usuario pidió: "${userQuery}". Contexto: ${contextHint}. Frase de aviso:`,
+          },
+        ],
+        max_tokens: 20,
+        temperature: 0.3,
+      });
+
+      const ack = completion.choices[0]?.message?.content?.trim();
+      if (ack && ack.length > 2 && ack.length < 90) {
+        return ack.replace(/["'*]/g, '');
+      }
+    } catch (err: any) {
+      this.logger.warn(`FastAck Pre-LLM failed: ${err.message}`);
+    }
+    return null;
+  }
+
   async *streamResponse(
     userQuery: string,
     ragContext: string[] = [],

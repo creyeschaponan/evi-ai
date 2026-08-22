@@ -666,6 +666,47 @@ socket.on('google_workspace_status', (status) => {
   }
 });
 
+// Latency Masking (Aviso Previo) Dual Mode Switch
+const ackModePreLlmBtn = document.getElementById('ackModePreLlmBtn');
+const ackModeStaticBtn = document.getElementById('ackModeStaticBtn');
+const ackModeLabel = document.getElementById('ackModeLabel');
+
+function setAckModeUI(mode) {
+  if (mode === 'pre_llm') {
+    ackModePreLlmBtn?.classList.add('active');
+    ackModeStaticBtn?.classList.remove('active');
+    if (ackModeLabel) {
+      ackModeLabel.textContent = 'PRE-LLM (~50ms)';
+      ackModeLabel.className = 'metric-val cyan';
+    }
+  } else {
+    ackModeStaticBtn?.classList.add('active');
+    ackModePreLlmBtn?.classList.remove('active');
+    if (ackModeLabel) {
+      ackModeLabel.textContent = 'ESTÁTICO (0ms)';
+      ackModeLabel.className = 'metric-val pink';
+    }
+  }
+}
+
+ackModePreLlmBtn?.addEventListener('click', () => {
+  setAckModeUI('pre_llm');
+  socket.emit('update_ack_mode', { mode: 'pre_llm' });
+});
+
+ackModeStaticBtn?.addEventListener('click', () => {
+  setAckModeUI('static');
+  socket.emit('update_ack_mode', { mode: 'static' });
+});
+
+socket.on('ack_mode', (data) => {
+  if (data?.mode) setAckModeUI(data.mode);
+});
+
+socket.on('ack_mode_updated', (data) => {
+  if (data?.mode) setAckModeUI(data.mode);
+});
+
 // =====================================================================
 // Dialogue UI Helpers (Max 2 Visible Subtitle Turns with Fade-Out)
 // =====================================================================
