@@ -284,37 +284,49 @@ let currentCoreState = 'STANDBY'; // 'STANDBY' | 'LISTENING' | 'THINKING' | 'SPE
 
 function setCoreState(state) {
   currentCoreState = state;
-  coreStateBadge.textContent = state;
+  if (coreStateBadge) {
+    coreStateBadge.textContent = state;
+  }
 
-  voiceCoreBtn.classList.remove('listening', 'speaking');
+  if (voiceCoreBtn) {
+    voiceCoreBtn.classList.remove('listening', 'speaking');
+  }
 
   if (state === 'STANDBY') {
-    coreStateBadge.style.color = 'var(--neon-cyan)';
-    coreStateBadge.style.borderColor = 'var(--neon-cyan)';
+    if (coreStateBadge) {
+      coreStateBadge.style.color = 'var(--neon-cyan)';
+      coreStateBadge.style.borderColor = 'var(--neon-cyan)';
+    }
     if (currentSettings.listeningMode === 'alexa') {
-      voicePromptText.textContent = 'DI "EVI" O PRESIONA [ESPACIO] PARA HABLAR';
-      voiceSubtext.textContent = 'Escucha continua activa // Modo Alexa operativo';
+      if (voicePromptText) voicePromptText.textContent = 'DI "EVI" O PRESIONA [ESPACIO] PARA HABLAR';
+      if (voiceSubtext) voiceSubtext.textContent = 'Escucha continua activa // Modo Alexa operativo';
     } else {
-      voicePromptText.textContent = 'TOCA EL NÚCLEO O PRESIONA [ESPACIO] PARA HABLAR';
-      voiceSubtext.textContent = 'Modo manual activo // Presiona para hablar';
+      if (voicePromptText) voicePromptText.textContent = 'TOCA EL NÚCLEO O PRESIONA [ESPACIO] PARA HABLAR';
+      if (voiceSubtext) voiceSubtext.textContent = 'Modo manual activo // Presiona para hablar';
     }
   } else if (state === 'LISTENING') {
-    coreStateBadge.style.color = 'var(--neon-pink-bright)';
-    coreStateBadge.style.borderColor = 'var(--neon-pink-bright)';
-    voiceCoreBtn.classList.add('listening');
-    voicePromptText.textContent = '🔴 ESCUCHANDO... HABLA AHORA';
-    voiceSubtext.textContent = 'Toca el núcleo o suelta Espacio para enviar';
+    if (coreStateBadge) {
+      coreStateBadge.style.color = 'var(--neon-pink-bright)';
+      coreStateBadge.style.borderColor = 'var(--neon-pink-bright)';
+    }
+    if (voiceCoreBtn) voiceCoreBtn.classList.add('listening');
+    if (voicePromptText) voicePromptText.textContent = '🔴 ESCUCHANDO... HABLA AHORA';
+    if (voiceSubtext) voiceSubtext.textContent = 'Toca el núcleo o suelta Espacio para enviar';
   } else if (state === 'THINKING') {
-    coreStateBadge.style.color = 'var(--accent-purple)';
-    coreStateBadge.style.borderColor = 'var(--accent-purple)';
-    voicePromptText.textContent = '⚡ PROCESANDO RESPUESTA...';
-    voiceSubtext.textContent = 'Consultando LLM y base vectorial pgvector';
+    if (coreStateBadge) {
+      coreStateBadge.style.color = 'var(--accent-purple)';
+      coreStateBadge.style.borderColor = 'var(--accent-purple)';
+    }
+    if (voicePromptText) voicePromptText.textContent = '⚡ PROCESANDO RESPUESTA...';
+    if (voiceSubtext) voiceSubtext.textContent = 'Consultando LLM y base vectorial pgvector';
   } else if (state === 'SPEAKING') {
-    coreStateBadge.style.color = 'var(--neon-pink)';
-    coreStateBadge.style.borderColor = 'var(--neon-pink)';
-    voiceCoreBtn.classList.add('speaking');
-    voicePromptText.textContent = '🔊 EVI RESPONDIENDO';
-    voiceSubtext.textContent = 'Síntesis de voz neuronal de alta fidelidad';
+    if (coreStateBadge) {
+      coreStateBadge.style.color = 'var(--neon-pink)';
+      coreStateBadge.style.borderColor = 'var(--neon-pink)';
+    }
+    if (voiceCoreBtn) voiceCoreBtn.classList.add('speaking');
+    if (voicePromptText) voicePromptText.textContent = '🔊 EVI RESPONDIENDO';
+    if (voiceSubtext) voiceSubtext.textContent = 'Síntesis de voz neuronal de alta fidelidad';
   }
 }
 
@@ -499,15 +511,16 @@ function updateVoiceDropdownForEngine(engineId, selectedVoiceId) {
 }
 
 function updateRateSliderFromRateString(rateStr) {
-  if (!rateStr) return;
+  if (!rateStr || !ttsRateSlider) return;
   const num = parseInt(rateStr.replace('%', '').replace('+', ''));
   if (!isNaN(num)) {
     ttsRateSlider.value = num;
-    ttsRateDisplay.textContent = num >= 0 ? `+${num}%` : `${num}%`;
+    if (ttsRateDisplay) ttsRateDisplay.textContent = num >= 0 ? `+${num}%` : `${num}%`;
   }
 }
 
 function updateEngineBadge(engineId, voiceId) {
+  if (!ttsEngineBadgeText) return;
   const engineName =
     engineId === 'cosyvoice'
       ? 'COSYVOICE 3'
@@ -521,11 +534,11 @@ function updateEngineBadge(engineId, voiceId) {
 }
 
 // Event Listeners for Voice Toolbar
-ttsEngineSelect.addEventListener('change', () => {
+ttsEngineSelect?.addEventListener('change', () => {
   const selectedEngine = ttsEngineSelect.value;
   updateVoiceDropdownForEngine(selectedEngine);
-  const selectedVoice = ttsVoiceSelect.value;
-  const rateVal = parseInt(ttsRateSlider.value);
+  const selectedVoice = ttsVoiceSelect?.value;
+  const rateVal = parseInt(ttsRateSlider?.value || '20');
   const rateStr = rateVal >= 0 ? `+${rateVal}%` : `${rateVal}%`;
 
   socket.emit('update_tts_settings', {
@@ -536,19 +549,19 @@ ttsEngineSelect.addEventListener('change', () => {
   updateEngineBadge(selectedEngine, selectedVoice);
 });
 
-ttsVoiceSelect.addEventListener('change', () => {
+ttsVoiceSelect?.addEventListener('change', () => {
   const selectedVoice = ttsVoiceSelect.value;
   socket.emit('update_tts_settings', { voice: selectedVoice });
-  updateEngineBadge(ttsEngineSelect.value, selectedVoice);
+  updateEngineBadge(ttsEngineSelect?.value || 'edge', selectedVoice);
 });
 
-ttsRateSlider.addEventListener('input', () => {
+ttsRateSlider?.addEventListener('input', () => {
   const rateVal = parseInt(ttsRateSlider.value);
   const rateStr = rateVal >= 0 ? `+${rateVal}%` : `${rateVal}%`;
-  ttsRateDisplay.textContent = rateStr;
+  if (ttsRateDisplay) ttsRateDisplay.textContent = rateStr;
 });
 
-ttsRateSlider.addEventListener('change', () => {
+ttsRateSlider?.addEventListener('change', () => {
   const rateVal = parseInt(ttsRateSlider.value);
   const rateStr = rateVal >= 0 ? `+${rateVal}%` : `${rateVal}%`;
   socket.emit('update_tts_settings', { rate: rateStr });
@@ -879,45 +892,45 @@ document.querySelectorAll('.chip-btn-cyber').forEach(btn => {
   });
 });
 
-clearStreamBtn.addEventListener('click', () => {
-  dialogueFeed.innerHTML = '';
+clearStreamBtn?.addEventListener('click', () => {
+  if (dialogueFeed) dialogueFeed.innerHTML = '';
   socket.emit('clear_history');
 });
 
 // =========================================================
 // RAG Sync & Memory Modal
 // =========================================================
-syncRagBtn.addEventListener('click', () => {
+syncRagBtn?.addEventListener('click', () => {
   const span = syncRagBtn.querySelector('span');
-  span.textContent = 'SINCRONIZANDO...';
+  if (span) span.textContent = 'SINCRONIZANDO...';
   socket.emit('sync_knowledge');
   setTimeout(() => {
-    span.textContent = 'SYNC RAG';
+    if (span) span.textContent = 'SYNC RAG';
   }, 2000);
 });
 
-openMemoryModalBtn.addEventListener('click', () => {
-  memoryModal.classList.add('active');
+openMemoryModalBtn?.addEventListener('click', () => {
+  memoryModal?.classList.add('active');
   loadMemoriesList();
 });
 
 function closeMemoryModal() {
-  memoryModal.classList.remove('active');
+  memoryModal?.classList.remove('active');
 }
 
-closeModalBtn.addEventListener('click', closeMemoryModal);
-modalOverlay.addEventListener('click', closeMemoryModal);
+closeModalBtn?.addEventListener('click', closeMemoryModal);
+modalOverlay?.addEventListener('click', closeMemoryModal);
 
-saveMemoryBtn.addEventListener('click', () => {
-  const text = newMemoryInput.value.trim();
+saveMemoryBtn?.addEventListener('click', () => {
+  const text = newMemoryInput?.value.trim();
   if (text) {
     socket.emit('save_memory', { text, category: 'preference' });
-    newMemoryInput.value = '';
+    if (newMemoryInput) newMemoryInput.value = '';
     setTimeout(loadMemoriesList, 600);
   }
 });
 
-refreshMemoriesBtn.addEventListener('click', loadMemoriesList);
+refreshMemoriesBtn?.addEventListener('click', loadMemoriesList);
 
 function loadMemoriesList() {
   memoryItemsContainer.innerHTML = '<div class="loading-placeholder">Consultando base de datos pgvector...</div>';
