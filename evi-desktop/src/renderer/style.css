@@ -540,26 +540,16 @@ body {
 }
 
 /* =====================================================================
-   Main Grid Layout (Arc Reactor Center Stage 75% + Stream Sidebar 25%)
+   Main Grid Layout (Single Central Cockpit)
    ===================================================================== */
 .hud-main-grid {
-  display: grid;
-  grid-template-columns: 1fr 340px;
-  gap: 14px;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
   flex: 1;
-  min-height: 0; /* Important for flex-child scroll */
-}
-
-@media (max-width: 1100px) {
-  .hud-main-grid {
-    grid-template-columns: 1fr 280px;
-  }
-}
-
-@media (max-width: 850px) {
-  .hud-main-grid {
-    grid-template-columns: 1fr;
-  }
+  min-height: 0;
 }
 
 /* HUD Cards */
@@ -568,21 +558,23 @@ body {
   border: 1px solid var(--border-hud);
   border-radius: 12px;
   backdrop-filter: blur(16px);
-  padding: 16px;
+  padding: 16px 22px;
   display: flex;
   flex-direction: column;
   position: relative;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
   min-height: 0;
+  width: 100%;
 }
 
 .card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   padding-bottom: 8px;
   border-bottom: 1px solid rgba(255, 0, 127, 0.15);
+  width: 100%;
 }
 
 .card-tag {
@@ -607,14 +599,15 @@ body {
 }
 
 /* =====================================================================
-   ARC REACTOR // CORE SECTION (MAJESTIC CENTERPIECE)
+   ARC REACTOR // CORE SECTION (400px CENTERPIECE)
    ===================================================================== */
 .core-section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 20px 24px;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
 }
 
 .reactor-wrapper {
@@ -830,74 +823,93 @@ body {
 .tel-val.magenta { color: var(--accent-magenta); }
 
 /* =====================================================================
-   STREAM & DIALOGUE SECTION
+   STREAM & FLOATING SUBTITLES SECTION (2-Turn Displacement)
    ===================================================================== */
 .stream-section {
   display: flex;
   flex-direction: column;
 }
 
-.dialogue-feed {
-  flex: 1;
-  overflow-y: auto;
-  padding: 6px 4px 6px 0;
+.dialogue-feed-floating {
+  width: 100%;
+  max-width: 780px;
+  min-height: 140px;
+  max-height: 240px;
+  margin: 6px auto 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-height: 0;
+  justify-content: flex-end;
+  gap: 12px;
+  overflow: hidden;
+  position: relative;
 }
 
-/* Custom Scrollbar Cyberpunk */
-.dialogue-feed::-webkit-scrollbar {
-  width: 4px;
-}
-
-.dialogue-feed::-webkit-scrollbar-track {
-  background: rgba(10, 7, 20, 0.5);
-  border-radius: 4px;
-}
-
-.dialogue-feed::-webkit-scrollbar-thumb {
-  background: var(--neon-pink);
-  border-radius: 4px;
-  box-shadow: 0 0 6px var(--neon-pink);
-}
-
-/* Message Cards */
+/* Message Cards with Elegant Slide-up & Fade-out */
 .message-card {
   display: flex;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  backdrop-filter: blur(8px);
-  animation: msgSlideIn 0.2s ease-out;
+  gap: 14px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  backdrop-filter: blur(14px);
+  animation: msgSlideInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.35s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
 }
 
-@keyframes msgSlideIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+.message-card.fading-out {
+  animation: msgFadeOutUp 0.38s ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes msgSlideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes msgFadeOutUp {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    max-height: 120px;
+    margin-bottom: 12px;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-24px) scale(0.94);
+    max-height: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-width: 0;
+  }
 }
 
 .evi-message {
-  background: rgba(22, 12, 38, 0.7);
-  border: 1px solid rgba(255, 0, 127, 0.3);
-  border-left: 3px solid var(--neon-pink);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(255, 0, 127, 0.05);
+  background: rgba(22, 12, 38, 0.85);
+  border: 1px solid rgba(255, 0, 127, 0.4);
+  border-left: 4px solid var(--neon-pink);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 0 16px rgba(255, 0, 127, 0.08);
 }
 
 .user-message {
-  background: rgba(8, 20, 36, 0.7);
-  border: 1px solid rgba(0, 240, 255, 0.3);
-  border-left: 3px solid var(--neon-cyan);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(0, 240, 255, 0.05);
+  background: rgba(8, 20, 36, 0.85);
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  border-left: 4px solid var(--neon-cyan);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 0 16px rgba(0, 240, 255, 0.08);
 }
 
 .msg-avatar {
   font-family: var(--font-hud);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 900;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 6px 10px;
+  border-radius: 6px;
   height: fit-content;
   letter-spacing: 1px;
 }
@@ -920,10 +932,10 @@ body {
 
 .msg-sender {
   font-family: var(--font-hud);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-pink);
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 
 .user-message .msg-sender {
@@ -932,15 +944,15 @@ body {
 
 .msg-time {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 400;
   color: var(--text-dim);
-  margin-left: 6px;
+  margin-left: 8px;
 }
 
 .msg-text {
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.55;
   color: var(--text-main);
   word-break: break-word;
 }
@@ -948,9 +960,12 @@ body {
 /* Quick Chips Bar */
 .quick-chips-bar {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   overflow-x: auto;
-  padding: 6px 0 4px;
+  padding: 8px 0 4px;
+  width: 100%;
+  max-width: 780px;
+  justify-content: center;
 }
 
 .quick-chips-bar::-webkit-scrollbar {

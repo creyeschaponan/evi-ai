@@ -605,9 +605,26 @@ socket.on('llm_config_updated', (cfg) => {
 });
 
 // =====================================================================
-// Dialogue UI Helpers
+// Dialogue UI Helpers (Max 2 Visible Subtitle Turns with Fade-Out)
 // =====================================================================
+function maintainMaxTwoMessages() {
+  const cards = Array.from(dialogueFeed.querySelectorAll('.message-card:not(.fading-out)'));
+  if (cards.length > 2) {
+    const toRemoveCount = cards.length - 2;
+    for (let i = 0; i < toRemoveCount; i++) {
+      const oldCard = cards[i];
+      oldCard.classList.add('fading-out');
+      setTimeout(() => {
+        if (oldCard.parentNode) {
+          oldCard.remove();
+        }
+      }, 380);
+    }
+  }
+}
+
 function appendUserMessage(text) {
+  maintainMaxTwoMessages();
   const card = document.createElement('div');
   card.className = 'message-card user-message';
   card.innerHTML = `
@@ -618,10 +635,11 @@ function appendUserMessage(text) {
     </div>
   `;
   dialogueFeed.appendChild(card);
-  dialogueFeed.scrollTop = dialogueFeed.scrollHeight;
+  maintainMaxTwoMessages();
 }
 
 function createEviMessageCard() {
+  maintainMaxTwoMessages();
   const card = document.createElement('div');
   card.className = 'message-card evi-message';
   card.innerHTML = `
@@ -632,7 +650,7 @@ function createEviMessageCard() {
     </div>
   `;
   dialogueFeed.appendChild(card);
-  dialogueFeed.scrollTop = dialogueFeed.scrollHeight;
+  maintainMaxTwoMessages();
   return card;
 }
 

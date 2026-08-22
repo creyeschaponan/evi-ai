@@ -10,10 +10,10 @@ export class TtsService {
   private readonly logger = new Logger(TtsService.name);
   private readonly providers: Map<TtsEngineType, ITtsProvider> = new Map();
 
-  // Configuración activa por defecto: Microsoft Neural (Edge-TTS) Dalia / Camila (Instantánea y Gratuita)
+  // Configuración activa por defecto: Microsoft Neural (Edge-TTS) Camila (Perú)
   private currentConfig: TtsConfig = {
     engine: (process.env.TTS_DEFAULT_ENGINE as TtsEngineType) || 'edge',
-    voice: process.env.TTS_DEFAULT_VOICE || 'es-MX-DaliaNeural',
+    voice: process.env.TTS_DEFAULT_VOICE || 'es-PE-CamilaNeural',
     rate: process.env.TTS_DEFAULT_RATE || '+20%',
   };
 

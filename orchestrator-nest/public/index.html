@@ -133,9 +133,8 @@
       </div>
     </div>
 
-    <!-- Main Grid: Core Reactor & Live Stream -->
-    <main class="hud-main-grid">
-      <!-- Columna Izquierda: Reactor Central y Visualizador -->
+    <!-- Main Cockpit: Arc Reactor + Subtitle Stream (2-Turn Displacement) + Input Deck -->
+    <main class="hud-main-grid single-cockpit">
       <section class="hud-card core-section">
         <div class="card-header">
           <span class="card-tag">ARC REACTOR // QUANTUM VOICE CORE</span>
@@ -179,43 +178,8 @@
           <div class="voice-subtext" id="voiceSubtext">Micrófono permanente activado // Audio 16kHz PCM</div>
         </div>
 
-        <!-- Telemetría de Infraestructura Local -->
-        <div class="telemetry-grid">
-          <div class="telemetry-item">
-            <span class="tel-label">GPU HARDWARE</span>
-            <span class="tel-val pink">RTX 3060 CUDA</span>
-          </div>
-          <div class="telemetry-item">
-            <span class="tel-label">LLM ENGINE</span>
-            <span class="tel-val cyan">QWEN 14B / 8B</span>
-          </div>
-          <div class="telemetry-item">
-            <span class="tel-label">TTS ENGINE</span>
-            <span class="tel-val purple">COSYVOICE 3</span>
-          </div>
-          <div class="telemetry-item">
-            <span class="tel-label">RAG VECTOR DB</span>
-            <span class="tel-val magenta">PGVECTOR 1024-D</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- Columna Derecha: Consola Táctica de Conversación -->
-      <section class="hud-card stream-section">
-        <div class="card-header">
-          <span class="card-tag">HOLOGRAPHIC STREAM // DIÁLOGO TÁCTICO</span>
-          <div class="header-actions">
-            <button class="btn-icon-cyber" id="clearStreamBtn" title="Limpiar historial de pantalla">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- Feed de Mensajes -->
-        <div class="dialogue-feed" id="dialogueFeed">
+        <!-- Feed de Conversación Flotante (Máximo 2 turnos elegantes con desplazamiento ascendente) -->
+        <div class="dialogue-feed-floating" id="dialogueFeed">
           <div class="message-card evi-message">
             <div class="msg-avatar">EVI</div>
             <div class="msg-content">
@@ -248,6 +212,26 @@
           <div class="keyboard-hints">
             <span><kbd>ESPACIO</kbd> Mantener para hablar</span>
             <span><kbd>ENTER</kbd> Enviar</span>
+          </div>
+        </div>
+
+        <!-- Telemetría de Infraestructura Local -->
+        <div class="telemetry-grid">
+          <div class="telemetry-item">
+            <span class="tel-label">GPU HARDWARE</span>
+            <span class="tel-val pink">RTX 3060 CUDA</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="tel-label">LLM ENGINE</span>
+            <span class="tel-val cyan" id="telLlmEngine">GROQ 20B (800 TPS)</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="tel-label">TTS ENGINE</span>
+            <span class="tel-val purple" id="telTtsEngine">EDGE CAMILA (PERÚ)</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="tel-label">RAG VECTOR DB</span>
+            <span class="tel-val magenta">PGVECTOR 1024-D</span>
           </div>
         </div>
       </section>

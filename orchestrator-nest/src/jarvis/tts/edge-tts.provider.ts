@@ -8,7 +8,7 @@ export class EdgeTtsProvider implements ITtsProvider {
   readonly displayName = 'Microsoft Neural (Edge-TTS)';
   private readonly logger = new Logger(EdgeTtsProvider.name);
 
-  private readonly defaultVoice = process.env.EDGE_TTS_VOICE || 'es-MX-DaliaNeural';
+  private readonly defaultVoice = process.env.EDGE_TTS_VOICE || 'es-PE-CamilaNeural';
   private readonly defaultFormat = OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3;
   private readonly defaultRate = process.env.EDGE_TTS_RATE || '+20%';
 
