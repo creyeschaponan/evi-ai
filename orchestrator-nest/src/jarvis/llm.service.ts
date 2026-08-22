@@ -20,7 +20,7 @@ export class LlmService {
   private geminiClient?: OpenAI;
   private localClient: OpenAI;
 
-  private groqModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  private groqModel = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
   private geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
   private localModel = process.env.LLM_MODEL || 'Qwen3-8B';
 
@@ -52,9 +52,14 @@ export class LlmService {
     this.logger.log(`Active LLM Provider: [${this.activeProvider}]`);
   }
 
-  setProvider(provider: LlmProviderType) {
+  setProvider(provider: LlmProviderType, model?: string) {
     this.activeProvider = provider;
-    this.logger.log(`Switched active LLM provider to: [${provider}]`);
+    if (model) {
+      if (provider === 'groq') this.groqModel = model;
+      if (provider === 'gemini') this.geminiModel = model;
+      if (provider === 'local') this.localModel = model;
+    }
+    this.logger.log(`Switched active LLM provider to: [${provider}], Model: [${this.getActiveModel()}]`);
   }
 
   getActiveProvider(): LlmProviderType {

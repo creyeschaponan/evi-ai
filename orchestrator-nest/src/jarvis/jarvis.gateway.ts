@@ -84,10 +84,10 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('update_llm_settings')
   handleUpdateLlmSettings(
-    @MessageBody() settings: { provider: 'groq' | 'gemini' | 'local' },
+    @MessageBody() settings: { provider: 'groq' | 'gemini' | 'local'; model?: string },
     @ConnectedSocket() client: Socket,
   ) {
-    this.llmService.setProvider(settings.provider);
+    this.llmService.setProvider(settings.provider, settings.model);
     const updated = {
       provider: this.llmService.getActiveProvider(),
       model: this.llmService.getActiveModel(),

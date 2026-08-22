@@ -566,19 +566,41 @@ socket.on('tts_config_updated', (cfg) => {
 const llmProviderSelect = document.getElementById('llmProviderSelect');
 
 llmProviderSelect?.addEventListener('change', () => {
-  const selectedProvider = llmProviderSelect.value;
-  socket.emit('update_llm_settings', { provider: selectedProvider });
+  const val = llmProviderSelect.value;
+  if (val === 'groq') {
+    socket.emit('update_llm_settings', { provider: 'groq', model: 'openai/gpt-oss-120b' });
+  } else if (val === 'groq-20b') {
+    socket.emit('update_llm_settings', { provider: 'groq', model: 'openai/gpt-oss-20b' });
+  } else if (val === 'groq-qwen') {
+    socket.emit('update_llm_settings', { provider: 'groq', model: 'qwen/qwen3.6-27b' });
+  } else if (val === 'gemini') {
+    socket.emit('update_llm_settings', { provider: 'gemini', model: 'gemini-2.0-flash' });
+  } else if (val === 'local') {
+    socket.emit('update_llm_settings', { provider: 'local' });
+  }
 });
 
 socket.on('llm_config', (cfg) => {
   if (llmProviderSelect && cfg && cfg.provider) {
-    llmProviderSelect.value = cfg.provider;
+    if (cfg.provider === 'groq') {
+      if (cfg.model?.includes('20b')) llmProviderSelect.value = 'groq-20b';
+      else if (cfg.model?.includes('qwen')) llmProviderSelect.value = 'groq-qwen';
+      else llmProviderSelect.value = 'groq';
+    } else {
+      llmProviderSelect.value = cfg.provider;
+    }
   }
 });
 
 socket.on('llm_config_updated', (cfg) => {
   if (llmProviderSelect && cfg && cfg.provider) {
-    llmProviderSelect.value = cfg.provider;
+    if (cfg.provider === 'groq') {
+      if (cfg.model?.includes('20b')) llmProviderSelect.value = 'groq-20b';
+      else if (cfg.model?.includes('qwen')) llmProviderSelect.value = 'groq-qwen';
+      else llmProviderSelect.value = 'groq';
+    } else {
+      llmProviderSelect.value = cfg.provider;
+    }
   }
 });
 
