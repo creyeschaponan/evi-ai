@@ -226,7 +226,75 @@ export class GoogleMcpService {
   }
 
   /**
-   * Ejecuta una consulta genérica
+   * Consulta Google Drive directamente mediante la API oficial de Google
+   */
+  async queryDrive(userQuery: string, isRetry = false): Promise<McpToolResponse> {
+    const token = await this.googleAuth.getAccessToken();
+
+    if (!token) {
+      return {
+        success: false,
+        text: 'Aún no has configurado tus credenciales de Google Workspace en .env.',
+        source: 'drive',
+      };
+    }
+
+    try {
+      this.logger.log(`📁 [GOOGLE DRIVE API] Consultando archivos para: "${userQuery}"...`);
+      const url = `https://www.googleapis.com/drive/v3/files?pageSize=10&fields=files(id,name,mimeType,modifiedTime,size,webViewLink)&orderBy=modifiedTime%20desc`;
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401 && !isRetry) {
+          this.logger.warn('🔄 Token expirado en Drive API. Renovando...');
+          const freshToken = await this.googleAuth.forceRefreshToken();
+          if (freshToken) {
+            return this.queryDrive(userQuery, true);
+          }
+        }
+        return {
+          success: false,
+          text: 'No se pudo acceder a tus archivos de Google Drive.',
+          source: 'drive',
+        };
+      }
+
+      const data = await response.json();
+      const files: any[] = data.files || [];
+
+      if (files.length === 0) {
+        return {
+          success: true,
+          text: 'No tienes archivos recientes en tu Google Drive.',
+          source: 'drive',
+        };
+      }
+
+      const filesSummary = files.slice(0, 5).map((f, i) => {
+        const name = f.name || 'Archivo sin nombre';
+        const date = f.modifiedTime ? new Date(f.modifiedTime).toLocaleDateString('es-PE') : '';
+        return `Archivo ${i + 1}: "${name}" (${date}).`;
+      }).join(' ');
+
+      return {
+        success: true,
+        text: `Tienes ${files.length} archivos recientes en Google Drive: ${filesSummary}`,
+        source: 'drive',
+        raw: files,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        text: `Error al consultar Google Drive: ${error.message}`,
+        source: 'drive',
+      };
+    }
+  }
+
+  /**
+   * Ejecuta una consulta genérica con fallback inteligente a API nativa o Groq MCP
    */
   async queryWorkspaceMcp(
     connectorId: 'connector_gmail' | 'connector_googlecalendar' | 'connector_googledrive',
@@ -238,6 +306,9 @@ export class GoogleMcpService {
     }
     if (connectorId === 'connector_googlecalendar') {
       return this.getTodayCalendarSummary();
+    }
+    if (connectorId === 'connector_googledrive') {
+      return this.queryDrive(userInput);
     }
     return {
       success: false,
