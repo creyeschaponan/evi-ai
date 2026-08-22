@@ -38,11 +38,29 @@ export class GoogleMcpService {
       };
     }
 
+    const now = new Date();
+    const currentTimeLima = now.toLocaleTimeString('es-PE', {
+      timeZone: 'America/Lima',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+    const currentDateLima = now.toLocaleDateString('es-PE', {
+      timeZone: 'America/Lima',
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
     const prompt =
-      customPrompt ||
-      `Lee y analiza los ${count} correos electrónicos más recientes recibidos hoy en la bandeja de entrada del usuario. ` +
-      `Genera un resumen conversacional en español conciso y directo, estructurado para ser leído en voz alta por un asistente. ` +
-      `Menciona quién envía, el asunto y un resumen de 1 sola frase con lo esencial de cada correo. Si no hay correos hoy, infórmalo claramente.`;
+      `Hora actual del usuario en Lima, Perú: ${currentTimeLima} (${currentDateLima}). ` +
+      `Consulta los ${count} correos más recientes en la bandeja de Gmail del usuario y genera un resumen conversacional en español optimizado para ser leído en voz alta por la asistente EVI. ` +
+      `\n\nREGLAS OBLIGATORIAS:` +
+      `\n1. NO uses tablas Markdown ni formatos tabulares.` +
+      `\n2. NO menciones fechas completas ni en formato ISO/UTC (nada de 2026-08-22 ni segundos). Como son de hoy, solo menciona la hora y minutos en formato natural peruano (ejemplo: "a las 9:38 de la noche", "a las 8:35 p.m.", "a las 7:51 p.m.").` +
+      `\n3. Para cada correo, di en una sola frase concisa y elegante quién lo envía, a qué hora llegó y de qué trata.` +
+      `\n4. Estructúralo como un párrafo continuo o lista sencilla de 5 puntos muy breves y fáciles de escuchar.`;
 
     try {
       this.logger.log(`Conectando con Groq MCP Gmail Connector (${count} correos)...`);
