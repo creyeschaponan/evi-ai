@@ -57,6 +57,16 @@ export class LlmService {
     this.logger.log(`Switched active LLM provider to: [${provider}]`);
   }
 
+  getActiveProvider(): LlmProviderType {
+    return this.activeProvider;
+  }
+
+  getActiveModel(): string {
+    if (this.activeProvider === 'groq') return this.groqModel;
+    if (this.activeProvider === 'gemini') return this.geminiModel;
+    return this.localModel;
+  }
+
   setApiKeys(groqKey?: string, geminiKey?: string) {
     if (groqKey) {
       this.groqClient = new OpenAI({

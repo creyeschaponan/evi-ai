@@ -36,8 +36,12 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
-    // Enviar catálogo completo de motores, voces y configuración activa al conectarse
+    // Enviar catálogo completo de motores TTS y configuración LLM al conectarse
     client.emit('tts_catalog', this.ttsService.getCatalog());
+    client.emit('llm_config', {
+      provider: this.llmService.getActiveProvider(),
+      model: this.llmService.getActiveModel(),
+    });
   }
 
   handleDisconnect(client: Socket) {
@@ -57,6 +61,21 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const updated = this.ttsService.updateConfig(settings);
     client.emit('tts_config_updated', updated);
     this.logger.log(`TTS Settings updated from client ${client.id}: Engine=[${updated.engine}], Voice=[${updated.voice}], Rate=[${updated.rate}]`);
+    return updated;
+  }
+
+  @SubscribeMessage('update_llm_settings')
+  handleUpdateLlmSettings(
+    @MessageBody() settings: { provider: 'groq' | 'gemini' | 'local' },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.llmService.setProvider(settings.provider);
+    const updated = {
+      provider: this.llmService.getActiveProvider(),
+      model: this.llmService.getActiveModel(),
+    };
+    client.emit('llm_config_updated', updated);
+    this.logger.log(`LLM Provider switched by client ${client.id}: [${updated.provider}] -> Model: [${updated.model}]`);
     return updated;
   }
 

@@ -408,6 +408,26 @@ socket.on('tts_config_updated', (cfg) => {
   updateEngineBadge(cfg.engine, cfg.voice);
 });
 
+// LLM Engine Selector
+const llmProviderSelect = document.getElementById('llmProviderSelect');
+
+llmProviderSelect?.addEventListener('change', () => {
+  const selectedProvider = llmProviderSelect.value;
+  socket.emit('update_llm_settings', { provider: selectedProvider });
+});
+
+socket.on('llm_config', (cfg) => {
+  if (llmProviderSelect && cfg && cfg.provider) {
+    llmProviderSelect.value = cfg.provider;
+  }
+});
+
+socket.on('llm_config_updated', (cfg) => {
+  if (llmProviderSelect && cfg && cfg.provider) {
+    llmProviderSelect.value = cfg.provider;
+  }
+});
+
 // =====================================================================
 // Dialogue UI Helpers
 // =====================================================================
