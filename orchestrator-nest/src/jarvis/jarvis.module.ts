@@ -11,6 +11,7 @@ import { SttService } from './stt.service';
 import { KnowledgeIngestService } from './knowledge-ingest.service';
 import { WindowsService } from './windows.service';
 import { WeatherService } from './weather.service';
+import { SystemMetricsService } from './system-metrics.service';
 
 @Module({
   providers: [
@@ -26,6 +27,7 @@ import { WeatherService } from './weather.service';
     KnowledgeIngestService,
     WindowsService,
     WeatherService,
+    SystemMetricsService,
   ],
   exports: [
     LlmService,
@@ -39,6 +41,7 @@ import { WeatherService } from './weather.service';
     KnowledgeIngestService,
     WindowsService,
     WeatherService,
+    SystemMetricsService,
   ],
 })
 export class JarvisModule {}

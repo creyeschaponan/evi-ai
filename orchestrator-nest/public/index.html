@@ -64,93 +64,110 @@
       </div>
     </header>
 
-    <!-- Toolbar Táctica de IA y Voz -->
-    <div class="hud-voice-toolbar">
-      <!-- Selector de Motor LLM (Groq / Gemini / Local) -->
-      <div class="voice-toolbar-group">
-        <label for="llmProviderSelect" class="toolbar-label">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M12 6v6l4 2"></path>
-          </svg>
-          MOTOR LLM:
-        </label>
-        <select id="llmProviderSelect" class="hud-select">
-          <option value="groq" selected>⚡ Groq (OpenAI GPT-OSS 120B)</option>
-          <option value="groq-20b">⚡ Groq (OpenAI GPT-OSS 20B - Turbo)</option>
-          <option value="groq-qwen">⚡ Groq (Qwen 3.6 - 27B)</option>
-          <option value="gemini">✨ Google Gemini Flash (2.0)</option>
-          <option value="local">🖥️ GPU Local (Qwen 8B CUDA)</option>
-        </select>
-      </div>
-
-      <!-- Selector de Motor TTS -->
-      <div class="voice-toolbar-group">
-        <label for="ttsEngineSelect" class="toolbar-label">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-            <line x1="12" y1="19" x2="12" y2="22"></line>
-          </svg>
-          VOZ TTS:
-        </label>
-        <select id="ttsEngineSelect" class="hud-select">
-          <option value="edge" selected>Microsoft Neural (Edge-TTS)</option>
-          <option value="cosyvoice">CosyVoice 3 (Alibaba FunAudioLLM)</option>
-          <option value="piper">Piper TTS (100% Local Docker)</option>
-          <option value="chatterbox">Chatterbox TTS (Local Neural)</option>
-        </select>
-      </div>
-
-      <div class="voice-toolbar-group">
-        <label for="ttsVoiceSelect" class="toolbar-label">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
-            <line x1="9" y1="9" x2="9.01" y2="9"></line>
-            <line x1="15" y1="9" x2="15.01" y2="9"></line>
-          </svg>
-          VOZ:
-        </label>
-        <select id="ttsVoiceSelect" class="hud-select">
-          <!-- Opciones dinámicas cargadas por app.js -->
-        </select>
-      </div>
-
-      <div class="voice-toolbar-group rate-group">
-        <label for="ttsRateSlider" class="toolbar-label">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polyline>
-          </svg>
-          VELOCIDAD: <span id="ttsRateDisplay">+30%</span>
-        </label>
-        <input type="range" id="ttsRateSlider" min="-20" max="50" step="5" value="30" class="hud-slider">
-      </div>
-
-      <div class="voice-toolbar-badge" id="ttsEngineBadge">
-        <span class="badge-dot"></span>
-        <span id="ttsEngineBadgeText">COSYVOICE 3 // EMOCIONAL</span>
-      </div>
-    </div>
-
-    <!-- Main Cockpit: Arc Reactor + Subtitle Stream (2-Turn Displacement) + Input Deck -->
-    <main class="hud-main-grid single-cockpit">
-      <section class="hud-card core-section">
-        <div class="card-header">
-          <span class="card-tag">ARC REACTOR // QUANTUM VOICE CORE</span>
-          <span class="card-status-badge" id="coreStateBadge">STANDBY</span>
+    <!-- Main Cockpit: Fullscreen Cyberpunk HUD with Left & Right Flanks -->
+    <main class="hud-main-fullscreen">
+      <!-- FLANK IZQUIERDO: Monitoreo de Hardware y Recursos en Tiempo Real -->
+      <aside class="hud-flank flank-left">
+        <!-- CPU Card -->
+        <div class="hud-widget">
+          <div class="widget-header">
+            <span class="widget-icon">⚡</span>
+            <span class="widget-title">CPU // PROCESADOR</span>
+            <span class="widget-badge" id="cpuBadge">12%</span>
+          </div>
+          <div class="widget-body">
+            <div class="metric-row">
+              <span class="metric-label">MODELO:</span>
+              <span class="metric-val" id="cpuModel">Multi-Core</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">NÚCLEOS:</span>
+              <span class="metric-val" id="cpuCores">-- Cores</span>
+            </div>
+            <div class="cyber-progress-bar">
+              <div class="progress-fill cyan" id="cpuProgress" style="width: 12%"></div>
+            </div>
+          </div>
         </div>
 
+        <!-- NVIDIA GPU RTX 3060 Card -->
+        <div class="hud-widget">
+          <div class="widget-header">
+            <span class="widget-icon">🎮</span>
+            <span class="widget-title">NVIDIA RTX 3060 CUDA</span>
+            <span class="widget-badge pink" id="gpuBadge">CUDA OK</span>
+          </div>
+          <div class="widget-body">
+            <div class="metric-row">
+              <span class="metric-label">CARGA GPU:</span>
+              <span class="metric-val pink" id="gpuLoad">0%</span>
+            </div>
+            <div class="cyber-progress-bar">
+              <div class="progress-fill pink" id="gpuProgress" style="width: 15%"></div>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">VRAM USADA:</span>
+              <span class="metric-val" id="gpuVram">2.7 / 12.0 GB</span>
+            </div>
+            <div class="cyber-progress-bar">
+              <div class="progress-fill purple" id="vramProgress" style="width: 23%"></div>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">TEMPERATURA:</span>
+              <span class="metric-val green" id="gpuTemp">45°C</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RAM Card -->
+        <div class="hud-widget">
+          <div class="widget-header">
+            <span class="widget-icon">💾</span>
+            <span class="widget-title">MEMORIA RAM</span>
+            <span class="widget-badge" id="ramBadge">28%</span>
+          </div>
+          <div class="widget-body">
+            <div class="metric-row">
+              <span class="metric-label">USO TOTAL:</span>
+              <span class="metric-val" id="ramUsage">8.5 GB / 32.0 GB</span>
+            </div>
+            <div class="cyber-progress-bar">
+              <div class="progress-fill cyan" id="ramProgress" style="width: 28%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Audio VU / VAD Card -->
+        <div class="hud-widget">
+          <div class="widget-header">
+            <span class="widget-icon">🎙️</span>
+            <span class="widget-title">ENTRADA DE AUDIO // VAD</span>
+            <span class="widget-badge green" id="vadBadge">ACTIVO</span>
+          </div>
+          <div class="widget-body">
+            <div class="metric-row">
+              <span class="metric-label">MUESTREO:</span>
+              <span class="metric-val cyan">16kHz PCM</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">SUPRESIÓN RUIDO:</span>
+              <span class="metric-val green">SILERO VAD</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- CENTRO: ARC REACTOR + SUBTÍTULOS DE 2 TURNOS + INPUT DECK -->
+      <section class="hud-center-stage">
         <!-- Reactor Holográfico Central (Jarvis Arc Reactor Style) -->
         <div class="reactor-wrapper">
-          <!-- Anillos Giratorios Externos con Resplandor Rosa y Cian -->
           <div class="hud-ring ring-outer"></div>
           <div class="hud-ring ring-middle"></div>
           <div class="hud-ring ring-inner"></div>
           <div class="hud-ring ring-ticks"></div>
 
           <!-- Canvas para Ondas de Audio en Tiempo Real -->
-          <canvas id="visualizerCanvas" class="visualizer-canvas" width="300" height="300"></canvas>
+          <canvas id="visualizerCanvas" class="visualizer-canvas" width="420" height="420"></canvas>
 
           <!-- Núcleo Central Interactivo con efecto Arc Reactor -->
           <div class="core-center" id="voiceCoreBtn" title="Presiona o mantén para hablar con EVI">
@@ -178,13 +195,13 @@
           <div class="voice-subtext" id="voiceSubtext">Micrófono permanente activado // Audio 16kHz PCM</div>
         </div>
 
-        <!-- Feed de Conversación Flotante (Máximo 2 turnos elegantes con desplazamiento ascendente) -->
+        <!-- Feed de Conversación Flotante (Solo 2 turnos visibles que se desplazan elegantemente) -->
         <div class="dialogue-feed-floating" id="dialogueFeed">
           <div class="message-card evi-message">
             <div class="msg-avatar">EVI</div>
             <div class="msg-content">
               <div class="msg-sender">E.V.I. <span class="msg-time" id="initTime"></span></div>
-              <div class="msg-text">Todos los sistemas locales están operativos en tu RTX 3060. Puedes hablarme o escribir cuando gustes. ¿Qué podemos hacer hoy?</div>
+              <div class="msg-text">Todos los sistemas locales y en la nube están operativos. Puedes hablarme o escribir cuando gustes. ¿Qué podemos hacer hoy?</div>
             </div>
           </div>
         </div>
@@ -214,27 +231,106 @@
             <span><kbd>ENTER</kbd> Enviar</span>
           </div>
         </div>
+      </section>
 
-        <!-- Telemetría de Infraestructura Local -->
-        <div class="telemetry-grid">
-          <div class="telemetry-item">
-            <span class="tel-label">GPU HARDWARE</span>
-            <span class="tel-val pink">RTX 3060 CUDA</span>
+      <!-- FLANK DERECHO: Telemetría de Inteligencia Artificial y Pipeline -->
+      <aside class="hud-flank flank-right">
+        <!-- LLM Matrix Widget -->
+        <div class="hud-widget">
+          <div class="widget-header">
+            <span class="widget-icon">🧠</span>
+            <span class="widget-title">LLM // COGNITIVE CORE</span>
+            <span class="widget-badge pink" id="llmStatusBadge">ONLINE</span>
           </div>
-          <div class="telemetry-item">
-            <span class="tel-label">LLM ENGINE</span>
-            <span class="tel-val cyan" id="telLlmEngine">GROQ 20B (800 TPS)</span>
-          </div>
-          <div class="telemetry-item">
-            <span class="tel-label">TTS ENGINE</span>
-            <span class="tel-val purple" id="telTtsEngine">EDGE CAMILA (PERÚ)</span>
-          </div>
-          <div class="telemetry-item">
-            <span class="tel-label">RAG VECTOR DB</span>
-            <span class="tel-val magenta">PGVECTOR 1024-D</span>
+          <div class="widget-body">
+            <div class="metric-row">
+              <span class="metric-label">PROVEEDOR:</span>
+              <span class="metric-val pink" id="llmProviderVal">GROQ CLOUD</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">MODELO:</span>
+              <span class="metric-val cyan" id="llmModelVal">GPT-OSS 20B</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">VELOCIDAD:</span>
+              <span class="metric-val green">~800 TOK/S</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">LATENCIA TOKEN:</span>
+              <span class="metric-val cyan">~490 ms</span>
+            </div>
           </div>
         </div>
-      </section>
+
+        <!-- TTS Synthesizer Widget -->
+        <div class="hud-widget">
+          <div class="widget-header">
+            <span class="widget-icon">🔊</span>
+            <span class="widget-title">SÍNTESIS // VOZ NEURAL</span>
+            <span class="widget-badge cyan">24kHz HD</span>
+          </div>
+          <div class="widget-body">
+            <div class="metric-row">
+              <span class="metric-label">MOTOR:</span>
+              <span class="metric-val cyan">MICROSOFT NEURAL</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">VOZ:</span>
+              <span class="metric-val pink">CAMILA (PERÚ)</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">VELOCIDAD:</span>
+              <span class="metric-val green">+20%</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">LATENCIA BUFFER:</span>
+              <span class="metric-val cyan">&lt; 120 ms</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RAG & Vector Memory Widget -->
+        <div class="hud-widget">
+          <div class="widget-header">
+            <span class="widget-icon">🔮</span>
+            <span class="widget-title">RAG // MEMORIA VECTORIAL</span>
+            <span class="widget-badge purple">PGVECTOR</span>
+          </div>
+          <div class="widget-body">
+            <div class="metric-row">
+              <span class="metric-label">MOTOR VECTOR:</span>
+              <span class="metric-val purple">POSTGRESQL 1024-D</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">EMBEDDINGS:</span>
+              <span class="metric-val cyan">bge-m3 CUDA</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">HISTORIAL SESIÓN:</span>
+              <span class="metric-val green">ACTIVO (12 TURNOS)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Latency Roundtrip Widget -->
+        <div class="hud-widget">
+          <div class="widget-header">
+            <span class="widget-icon">🌐</span>
+            <span class="widget-title">PIPELINE TOTAL</span>
+            <span class="widget-badge green">ULTRA-FAST</span>
+          </div>
+          <div class="widget-body">
+            <div class="metric-row">
+              <span class="metric-label">STT + LLM + TTS:</span>
+              <span class="metric-val green">&lt; 650 ms</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">FALLBACK LOCAL:</span>
+              <span class="metric-val pink">AUTO-CUDA</span>
+            </div>
+          </div>
+        </div>
+      </aside>
     </main>
   </div>
 

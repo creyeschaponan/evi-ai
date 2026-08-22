@@ -1,12 +1,13 @@
 import {
   WebSocketGateway,
+  WebSocketServer,
   SubscribeMessage,
   MessageBody,
   ConnectedSocket,
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
-import { Socket } from 'socket.io';
+import { Socket, Server } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { LlmService } from './llm.service';
 import { TtsService } from './tts.service';
@@ -15,6 +16,7 @@ import { SttService } from './stt.service';
 import { KnowledgeIngestService } from './knowledge-ingest.service';
 import { WindowsService } from './windows.service';
 import { WeatherService } from './weather.service';
+import { SystemMetricsService } from './system-metrics.service';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -24,6 +26,10 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(JarvisGateway.name);
   private readonly SESSION_ID = 'cristian-desktop-session';
   private activeAbortControllers: Map<string, AbortController> = new Map();
+  private metricsInterval: NodeJS.Timeout | null = null;
+
+  @WebSocketServer()
+  server: Server;
 
   constructor(
     private readonly llmService: LlmService,
@@ -33,16 +39,24 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly knowledgeIngestService: KnowledgeIngestService,
     private readonly windowsService: WindowsService,
     private readonly weatherService: WeatherService,
-  ) {}
+    private readonly metricsService: SystemMetricsService,
+  ) {
+    this.metricsInterval = setInterval(() => {
+      if (this.server) {
+        this.server.emit('system_metrics', this.metricsService.getMetrics());
+      }
+    }, 2000);
+  }
 
   handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
-    // Enviar catálogo completo de motores TTS y configuración LLM al conectarse
+    // Enviar catálogo completo de motores TTS, configuración LLM y métricas iniciales
     client.emit('tts_catalog', this.ttsService.getCatalog());
     client.emit('llm_config', {
       provider: this.llmService.getActiveProvider(),
       model: this.llmService.getActiveModel(),
     });
+    client.emit('system_metrics', this.metricsService.getMetrics());
   }
 
   handleDisconnect(client: Socket) {

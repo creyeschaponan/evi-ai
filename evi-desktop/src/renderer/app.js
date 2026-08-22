@@ -581,26 +581,61 @@ llmProviderSelect?.addEventListener('change', () => {
 });
 
 socket.on('llm_config', (cfg) => {
-  if (llmProviderSelect && cfg && cfg.provider) {
-    if (cfg.provider === 'groq') {
-      if (cfg.model?.includes('20b')) llmProviderSelect.value = 'groq-20b';
-      else if (cfg.model?.includes('qwen')) llmProviderSelect.value = 'groq-qwen';
-      else llmProviderSelect.value = 'groq';
-    } else {
-      llmProviderSelect.value = cfg.provider;
-    }
+  if (cfg && cfg.provider) {
+    const providerVal = document.getElementById('llmProviderVal');
+    const modelVal = document.getElementById('llmModelVal');
+    if (providerVal) providerVal.textContent = cfg.provider.toUpperCase();
+    if (modelVal) modelVal.textContent = cfg.model ? cfg.model.toUpperCase() : 'AUTO';
   }
 });
 
 socket.on('llm_config_updated', (cfg) => {
-  if (llmProviderSelect && cfg && cfg.provider) {
-    if (cfg.provider === 'groq') {
-      if (cfg.model?.includes('20b')) llmProviderSelect.value = 'groq-20b';
-      else if (cfg.model?.includes('qwen')) llmProviderSelect.value = 'groq-qwen';
-      else llmProviderSelect.value = 'groq';
-    } else {
-      llmProviderSelect.value = cfg.provider;
-    }
+  if (cfg && cfg.provider) {
+    const providerVal = document.getElementById('llmProviderVal');
+    const modelVal = document.getElementById('llmModelVal');
+    if (providerVal) providerVal.textContent = cfg.provider.toUpperCase();
+    if (modelVal) modelVal.textContent = cfg.model ? cfg.model.toUpperCase() : 'AUTO';
+  }
+});
+
+// =====================================================================
+// Real-Time System Hardware Telemetry
+// =====================================================================
+const cpuBadge = document.getElementById('cpuBadge');
+const cpuModel = document.getElementById('cpuModel');
+const cpuCores = document.getElementById('cpuCores');
+const cpuProgress = document.getElementById('cpuProgress');
+
+const gpuBadge = document.getElementById('gpuBadge');
+const gpuLoad = document.getElementById('gpuLoad');
+const gpuProgress = document.getElementById('gpuProgress');
+const gpuVram = document.getElementById('gpuVram');
+const vramProgress = document.getElementById('vramProgress');
+const gpuTemp = document.getElementById('gpuTemp');
+
+const ramBadge = document.getElementById('ramBadge');
+const ramUsage = document.getElementById('ramUsage');
+const ramProgress = document.getElementById('ramProgress');
+
+socket.on('system_metrics', (m) => {
+  if (!m) return;
+  if (m.cpu) {
+    if (cpuBadge) cpuBadge.textContent = `${m.cpu.usagePercent}%`;
+    if (cpuProgress) cpuProgress.style.width = `${m.cpu.usagePercent}%`;
+    if (cpuModel && m.cpu.model) cpuModel.textContent = m.cpu.model.split(' ')[0] + ' ' + (m.cpu.model.split(' ')[1] || '');
+    if (cpuCores) cpuCores.textContent = `${m.cpu.cores} Cores`;
+  }
+  if (m.gpu) {
+    if (gpuLoad) gpuLoad.textContent = `${m.gpu.utilizationPercent}%`;
+    if (gpuProgress) gpuProgress.style.width = `${m.gpu.utilizationPercent}%`;
+    if (gpuVram) gpuVram.textContent = `${(m.gpu.memoryUsedMb / 1024).toFixed(1)} / ${(m.gpu.memoryTotalMb / 1024).toFixed(1)} GB`;
+    if (vramProgress) vramProgress.style.width = `${Math.min(100, Math.round((m.gpu.memoryUsedMb / m.gpu.memoryTotalMb) * 100))}%`;
+    if (gpuTemp) gpuTemp.textContent = `${m.gpu.temperatureC}°C`;
+  }
+  if (m.ram) {
+    if (ramBadge) ramBadge.textContent = `${m.ram.percent}%`;
+    if (ramUsage) ramUsage.textContent = `${m.ram.usedGb} GB / ${m.ram.totalGb} GB`;
+    if (ramProgress) ramProgress.style.width = `${m.ram.percent}%`;
   }
 });
 
