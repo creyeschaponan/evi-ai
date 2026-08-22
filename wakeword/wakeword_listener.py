@@ -2,7 +2,7 @@
 """
 =====================================================================
 E.V.I. - Custom Wake Word Listener Daemon ("Hey EVI" / "Hola EVI")
-Powered by openWakeWord & ONNX Runtime
+Powered by openWakeWord & ONNX Runtime (Real-Time Audio Stream)
 =====================================================================
 """
 import sys
@@ -12,7 +12,7 @@ import json
 import urllib.request
 import urllib.error
 
-# Forzar UTF-8 seguro en Windows Console para evitar UnicodeEncodeError
+# Forzar UTF-8 seguro en Windows Console
 if sys.platform == "win32":
     import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -31,11 +31,11 @@ MODEL_PATH = os.path.join(PROJECT_ROOT, "models", "hey_evi.onnx")
 ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "http://localhost:3000")
 TRIGGER_ENDPOINT = f"{ORCHESTRATOR_URL}/api/wakeword/trigger"
 
-# Parametros de Audio
+# Parametros de Audio para openWakeWord
 SAMPLE_RATE = 16000
-CHUNK_SAMPLES = 1280  # 80 ms a 16kHz
-DETECTION_THRESHOLD = 0.50
-COOLDOWN_SECONDS = 1.8
+CHUNK_SAMPLES = 1280  # 80 ms a 16kHz (1280 muestras por frame)
+DETECTION_THRESHOLD = 0.35  # Umbral optimizado para capturar voz natural
+COOLDOWN_SECONDS = 1.6
 
 def trigger_orchestrator(score: float, model_name: str = "hey_evi"):
     """Envia notificacion HTTP al orquestador NestJS cuando se detecta el Wake Word."""
@@ -54,19 +54,19 @@ def trigger_orchestrator(score: float, model_name: str = "hey_evi"):
     try:
         with urllib.request.urlopen(req, timeout=1.5) as resp:
             if resp.status == 200:
-                print(f"[WAKE WORD TRIGGER SENT] Status: 200 -> Orchestrator activated!")
+                print(f"\n📡 [TRIGGER ENVIADO] Orquestador NestJS activado! (Status 200)")
     except urllib.error.URLError as err:
-        print(f"[ORCHESTRATOR OFFLINE] Could not reach {TRIGGER_ENDPOINT}: {err.reason}")
+        print(f"\n⚠️ [ORQUESTADOR OFFLINE] No se pudo conectar a {TRIGGER_ENDPOINT}: {err.reason}")
     except Exception as ex:
-        print(f"[TRIGGER ERROR]: {ex}")
+        print(f"\n⚠️ [TRIGGER ERROR]: {ex}")
 
 def main():
-    print("=" * 65)
-    print("  [E.V.I.] WAKE WORD LISTENER DAEMON ('Hey EVI' / 'Hola EVI')")
-    print("=" * 65)
+    print("=" * 68)
+    print("  🚀 [E.V.I.] WAKE WORD LISTENER DAEMON ('Hey EVI' / 'Hola EVI')")
+    print("=" * 68)
 
     if not os.path.exists(MODEL_PATH):
-        print(f"[ERROR] Model not found at: {MODEL_PATH}")
+        print(f"❌ [ERROR] Modelo no encontrado en: {MODEL_PATH}")
         sys.exit(1)
 
     print(f"[*] Cargando modelo: {MODEL_PATH} ...")
@@ -75,57 +75,74 @@ def main():
             wakeword_models=[MODEL_PATH],
             inference_framework="onnx"
         )
-        print(f"[OK] Modelo cargado con exito. Claves activas: {list(oww_model.models.keys())}")
+        print(f"✅ [OK] Modelo cargado con exito. Claves activas: {list(oww_model.models.keys())}")
     except Exception as e:
-        print(f"[ERROR al cargar modelo]: {e}")
+        print(f"❌ [ERROR al cargar modelo]: {e}")
         sys.exit(1)
 
     try:
         default_device = sd.query_devices(kind='input')
-        print(f"[AUDIO] Microfono activo: {default_device['name']}")
+        print(f"🎙️ [AUDIO] Microfono activo: {default_device['name']}")
     except Exception as d_err:
-        print(f"[AUDIO] Dispositivo de entrada por defecto: {d_err}")
+        print(f"🎙️ [AUDIO] Dispositivo por defecto: {d_err}")
 
-    print(f"[CONFIG] Umbral de deteccion: {DETECTION_THRESHOLD} (Cooldown: {COOLDOWN_SECONDS}s)")
-    print(">>> Escuchando en segundo plano... Di 'Hey EVI', 'Okay EVI' o 'Hola EVI'...")
-    print("-" * 65)
+    print(f"🎯 [CONFIG] Umbral: {DETECTION_THRESHOLD} | Cooldown: {COOLDOWN_SECONDS}s")
+    print("👂 Escuchando en vivo... Di 'Hey EVI', 'Hola EVI' o 'Okay EVI'...")
+    print("=" * 68)
 
     last_trigger_time = 0
+    frame_counter = 0
 
     def audio_callback(indata, frames, time_info, status):
-        nonlocal last_trigger_time
+        nonlocal last_trigger_time, frame_counter
         if status:
             pass
 
-        # Convertir a int16 para openWakeWord
-        audio_chunk = (indata[:, 0] * 32767).astype(np.int16)
-        
-        # Realizar prediccion de Wake Word
-        prediction = oww_model.predict(audio_chunk)
+        # 1. Asegurar arreglo 1D plano de tipo int16 exacto
+        audio_1d = indata.flatten()
 
-        # Evaluar score del modelo
-        for model_key, score in prediction.items():
-            if score >= DETECTION_THRESHOLD:
-                current_time = time.time()
-                if (current_time - last_trigger_time) > COOLDOWN_SECONDS:
-                    last_trigger_time = current_time
-                    print(f"\n[WAKE WORD DETECTADO] Modelo: '{model_key}' | Confianza: {score:.4f} 🔥")
-                    trigger_orchestrator(score, model_key)
+        # 2. Calcular nivel RMS de volumen del microfono para feedback visual
+        rms = np.sqrt(np.mean(audio_1d.astype(np.float32) ** 2))
+        vol_pct = min(100, int((rms / 32768.0) * 800))
+
+        # 3. Prediccion openWakeWord en 1D
+        prediction = oww_model.predict(audio_1d)
+
+        # 4. Obtener score del modelo hey_evi
+        score = prediction.get("hey_evi", 0.0)
+
+        # Feedback en consola cada ~4 frames (320ms)
+        frame_counter += 1
+        if frame_counter % 4 == 0:
+            bars = "█" * (vol_pct // 10) + "░" * (10 - (vol_pct // 10))
+            score_bar = "🔥" if score >= DETECTION_THRESHOLD else ("⚡" if score > 0.15 else " ")
+            sys.stdout.write(f"\r[MIC: {bars} {vol_pct:2d}%] [Score Hey EVI: {score:0.3f}] {score_bar}   ")
+            sys.stdout.flush()
+
+        # 5. Evaluar deteccion
+        if score >= DETECTION_THRESHOLD:
+            current_time = time.time()
+            if (current_time - last_trigger_time) > COOLDOWN_SECONDS:
+                last_trigger_time = current_time
+                print(f"\n\n🔥 ========================================================")
+                print(f"⚡ [WAKE WORD DETECTADO] Score: {score:.4f} -> 'Hey EVI'!")
+                print(f"🔥 ========================================================\n")
+                trigger_orchestrator(score, "hey_evi")
 
     try:
         with sd.InputStream(
             samplerate=SAMPLE_RATE,
             channels=1,
-            dtype='float32',
+            dtype='int16',
             blocksize=CHUNK_SAMPLES,
             callback=audio_callback
         ):
             while True:
                 time.sleep(0.5)
     except KeyboardInterrupt:
-        print("\nDeteniendo Wake Word Listener...")
+        print("\n🛑 Deteniendo Wake Word Listener...")
     except Exception as err:
-        print(f"\n[ERROR en stream de audio]: {err}")
+        print(f"\n❌ [ERROR en stream de audio]: {err}")
 
 if __name__ == "__main__":
     main()
