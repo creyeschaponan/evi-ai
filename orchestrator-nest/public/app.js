@@ -1,526 +1,224 @@
 // =====================================================================
-// E.V.I. — JARVIS CYBERPUNK HUD CLIENT CONTROLLER
+// E.V.I. — S.H.I.E.L.D. OS / IRON MAN HUD CONTROLLER
 // =====================================================================
 
 const socket = io({ transports: ['websocket'] });
 
 // DOM Elements
-const voiceCoreBtn = document.getElementById('voiceCoreBtn');
+const arcReactor = document.getElementById('arcReactor');
+const coreCenterNum = document.getElementById('coreCenterNum');
 const voicePromptText = document.getElementById('voicePromptText');
 const voiceSubtext = document.getElementById('voiceSubtext');
-const coreStateBadge = document.getElementById('coreStateBadge');
 const statusPulseDot = document.getElementById('statusPulseDot');
 const statusLabel = document.getElementById('statusLabel');
 const dialogueFeed = document.getElementById('dialogueFeed');
-const queryInput = document.getElementById('queryInput');
-const sendTextBtn = document.getElementById('sendTextBtn');
-const clearStreamBtn = document.getElementById('clearStreamBtn');
 const syncRagBtn = document.getElementById('syncRagBtn');
 const openMemoryModalBtn = document.getElementById('openMemoryModalBtn');
 const memoryModal = document.getElementById('memoryModal');
-const closeModalBtn = document.getElementById('closeModalBtn');
-const modalOverlay = document.getElementById('modalOverlay');
+const closeMemoryModalBtn = document.getElementById('closeMemoryModalBtn');
 const saveMemoryBtn = document.getElementById('saveMemoryBtn');
 const newMemoryInput = document.getElementById('newMemoryInput');
 const refreshMemoriesBtn = document.getElementById('refreshMemoriesBtn');
 const memoryItemsContainer = document.getElementById('memoryItemsContainer');
-const visualizerCanvas = document.getElementById('visualizerCanvas');
-const canvasCtx = visualizerCanvas.getContext('2d');
+const btnRefreshBriefing = document.getElementById('btnRefreshBriefing');
 
-// TTS Toolbar Elements
-const ttsEngineSelect = document.getElementById('ttsEngineSelect');
-const ttsVoiceSelect = document.getElementById('ttsVoiceSelect');
-const ttsRateSlider = document.getElementById('ttsRateSlider');
-const ttsRateDisplay = document.getElementById('ttsRateDisplay');
-const ttsEngineBadgeText = document.getElementById('ttsEngineBadgeText');
-
-// Set Initial Time in Header
+// Initial Time Setup
 const initTimeElem = document.getElementById('initTime');
 if (initTimeElem) {
   initTimeElem.textContent = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
 }
 
 // =====================================================================
-// Audio Context & Holographic Arc Reactor Visualizer
+// Digital Reflection Clock (S.H.I.E.L.D. OS Style)
+// =====================================================================
+function updateShieldClock() {
+  const now = new Date();
+  
+  // Date in Spanish: "VIERNES, 22 DE AGOSTO DE 2026"
+  const dateStr = now.toLocaleDateString('es-PE', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  }).toUpperCase();
+  
+  const clockDateDisplay = document.getElementById('clockDateDisplay');
+  if (clockDateDisplay) clockDateDisplay.textContent = dateStr;
+  
+  // Time 12h format
+  let hours = now.getHours();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const hoursStr = String(hours).padStart(2, '0');
+  const minutesStr = String(now.getMinutes()).padStart(2, '0');
+  const timeStr = `${hoursStr}:${minutesStr}`;
+  
+  const clockTimeDigits = document.getElementById('clockTimeDigits');
+  const clockAmPm = document.getElementById('clockAmPm');
+  const clockReflection = document.getElementById('clockReflection');
+  
+  if (clockTimeDigits) clockTimeDigits.textContent = timeStr;
+  if (clockAmPm) clockAmPm.textContent = ampm;
+  if (clockReflection) clockReflection.textContent = `${timeStr} ${ampm}`;
+}
+setInterval(updateShieldClock, 1000);
+updateShieldClock();
+
+// =====================================================================
+// Audio Context & Playback Queue
 // =====================================================================
 let audioCtx = null;
-let analyser = null;
-let visualizerDataArray = null;
-let visualizerBufferLength = 0;
-let isVisualizerRunning = false;
+let isPlayingAudio = false;
+const audioQueue = [];
+let activeAudioSource = null;
 
 function initAudioContext() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 128;
-    analyser.smoothingTimeConstant = 0.85;
-    visualizerBufferLength = analyser.frequencyBinCount;
-    visualizerDataArray = new Uint8Array(visualizerBufferLength);
   }
   if (audioCtx.state === 'suspended') {
     audioCtx.resume();
   }
 }
 
-function startVisualizerLoop() {
-  if (isVisualizerRunning) return;
-  isVisualizerRunning = true;
-
-  let idleAngle = 0;
-
-  function renderVisualizer() {
-    requestAnimationFrame(renderVisualizer);
-
-    const width = visualizerCanvas.width = 400;
-    const height = visualizerCanvas.height = 400;
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const baseRadius = 86;
-
-    canvasCtx.clearRect(0, 0, width, height);
-    idleAngle += 0.02;
-
-    if (!analyser || (currentCoreState === 'STANDBY' && !isRecording && !isPlayingAudio)) {
-      // Idle Holographic Radar Sweep & Particles
-      const pulse = Math.sin(idleAngle * 2) * 3;
-      
-      // Halo Rosa Neón
-      canvasCtx.beginPath();
-      canvasCtx.arc(centerX, centerY, baseRadius + pulse, 0, 2 * Math.PI);
-      canvasCtx.strokeStyle = 'rgba(255, 0, 127, 0.35)';
-      canvasCtx.lineWidth = 2;
-      canvasCtx.shadowBlur = 12;
-      canvasCtx.shadowColor = '#ff007f';
-      canvasCtx.stroke();
-      canvasCtx.shadowBlur = 0;
-
-      // Nodos giratorios cian
-      for (let i = 0; i < 6; i++) {
-        const a = idleAngle + (i * Math.PI) / 3;
-        const x = centerX + Math.cos(a) * (baseRadius + 14);
-        const y = centerY + Math.sin(a) * (baseRadius + 14);
-        canvasCtx.beginPath();
-        canvasCtx.arc(x, y, 2.5, 0, 2 * Math.PI);
-        canvasCtx.fillStyle = '#00f0ff';
-        canvasCtx.fill();
-      }
-      return;
-    }
-
-    analyser.getByteFrequencyData(visualizerDataArray);
-
-    // Render Radial Sound Wave Reactor
-    const bars = visualizerBufferLength;
-    const step = (Math.PI * 2) / bars;
-
-    for (let i = 0; i < bars; i++) {
-      const val = visualizerDataArray[i] / 255.0;
-      const barLength = Math.max(3, val * 45);
-      const angle = i * step + idleAngle * 0.5;
-
-      const x1 = centerX + Math.cos(angle) * baseRadius;
-      const y1 = centerY + Math.sin(angle) * baseRadius;
-      const x2 = centerX + Math.cos(angle) * (baseRadius + barLength);
-      const y2 = centerY + Math.sin(angle) * (baseRadius + barLength);
-
-      canvasCtx.beginPath();
-      canvasCtx.moveTo(x1, y1);
-      canvasCtx.lineTo(x2, y2);
-
-      if (isRecording) {
-        // Modo Grabación: Resplandor Rosa Intenso
-        canvasCtx.strokeStyle = `rgba(255, 0, 127, ${0.4 + val * 0.6})`;
-        canvasCtx.shadowBlur = 10;
-        canvasCtx.shadowColor = '#ff007f';
-      } else {
-        // Modo Habla: Gradiente Neón Rosa/Cian
-        canvasCtx.strokeStyle = i % 2 === 0 
-          ? `rgba(255, 0, 127, ${0.5 + val * 0.5})` 
-          : `rgba(0, 240, 255, ${0.5 + val * 0.5})`;
-        canvasCtx.shadowBlur = 12;
-        canvasCtx.shadowColor = i % 2 === 0 ? '#ff007f' : '#00f0ff';
-      }
-
-      canvasCtx.lineWidth = 3;
-      canvasCtx.lineCap = 'round';
-      canvasCtx.stroke();
-      canvasCtx.shadowBlur = 0;
-    }
-  }
-
-  renderVisualizer();
-}
-
-startVisualizerLoop();
-
-// =====================================================================
-// UI State Management (Cyberpunk HUD states)
-// =====================================================================
-let currentCoreState = 'STANDBY'; // 'STANDBY' | 'LISTENING' | 'THINKING' | 'SPEAKING'
-
-function setCoreState(state) {
-  currentCoreState = state;
-  if (coreStateBadge) {
-    coreStateBadge.textContent = state;
-  }
-
-  if (voiceCoreBtn) {
-    voiceCoreBtn.classList.remove('listening', 'speaking');
-  }
-
-  if (state === 'STANDBY') {
-    if (coreStateBadge) {
-      coreStateBadge.style.color = 'var(--neon-cyan)';
-      coreStateBadge.style.borderColor = 'var(--neon-cyan)';
-    }
-    if (voicePromptText) voicePromptText.textContent = 'TOCA EL NÚCLEO O PRESIONA [ESPACIO] PARA HABLAR';
-    if (voiceSubtext) voiceSubtext.textContent = 'Micrófono permanente activado // Audio 16kHz PCM';
-  } else if (state === 'LISTENING') {
-    if (coreStateBadge) {
-      coreStateBadge.style.color = 'var(--neon-pink-bright)';
-      coreStateBadge.style.borderColor = 'var(--neon-pink-bright)';
-    }
-    if (voiceCoreBtn) voiceCoreBtn.classList.add('listening');
-    if (voicePromptText) voicePromptText.textContent = '🔴 ESCUCHANDO... HABLA AHORA';
-    if (voiceSubtext) voiceSubtext.textContent = 'Toca el núcleo o suelta Espacio para enviar';
-  } else if (state === 'THINKING') {
-    if (coreStateBadge) {
-      coreStateBadge.style.color = 'var(--accent-purple)';
-      coreStateBadge.style.borderColor = 'var(--accent-purple)';
-    }
-    if (voicePromptText) voicePromptText.textContent = '⚡ PROCESANDO RESPUESTA...';
-    if (voiceSubtext) voiceSubtext.textContent = 'Consultando LLM y base vectorial pgvector';
-  } else if (state === 'SPEAKING') {
-    if (coreStateBadge) {
-      coreStateBadge.style.color = 'var(--neon-pink)';
-      coreStateBadge.style.borderColor = 'var(--neon-pink)';
-    }
-    if (voiceCoreBtn) voiceCoreBtn.classList.add('speaking');
-    if (voicePromptText) voicePromptText.textContent = '🔊 EVI RESPONDIENDO';
-    if (voiceSubtext) voiceSubtext.textContent = 'Síntesis de voz neuronal de alta fidelidad';
-  }
-}
-
-// =====================================================================
-// Audio Playback Queue (FIFO Chronological Stream)
-// =====================================================================
-const audioPlaybackQueue = [];
-let isPlayingAudio = false;
-
-let currentPlayingAudio = null;
-
-function stopAndInterruptPlayback() {
-  const wasSpeaking = isPlayingAudio || currentCoreState === 'SPEAKING' || currentCoreState === 'THINKING';
-
-  if (currentPlayingAudio) {
-    try {
-      currentPlayingAudio.pause();
-      currentPlayingAudio.currentTime = 0;
-    } catch (e) {}
-    currentPlayingAudio = null;
-  }
-  audioPlaybackQueue.length = 0;
-  isPlayingAudio = false;
-
-  if (wasSpeaking) {
-    socket.emit('interrupt');
-  }
-}
-
-function playNextAudioChunk() {
-  if (audioPlaybackQueue.length === 0) {
+function playNextInQueue() {
+  if (audioQueue.length === 0) {
     isPlayingAudio = false;
-    currentPlayingAudio = null;
-    if (currentCoreState === 'SPEAKING') {
-      setCoreState('STANDBY');
-    }
+    setCoreState('STANDBY');
     return;
   }
 
   isPlayingAudio = true;
   setCoreState('SPEAKING');
+  const audioData = audioQueue.shift();
 
-  const base64Audio = audioPlaybackQueue.shift();
-  if (!base64Audio) {
-    playNextAudioChunk();
-    return;
-  }
+  initAudioContext();
+  audioCtx.decodeAudioData(
+    audioData.buffer.slice(0),
+    (buffer) => {
+      const source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioCtx.destination);
+      activeAudioSource = source;
 
-  try {
-    const binaryString = atob(base64Audio);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
+      source.onended = () => {
+        activeAudioSource = null;
+        playNextInQueue();
+      };
+
+      source.start(0);
+    },
+    (err) => {
+      console.warn('Audio decode error:', err);
+      playNextInQueue();
     }
+  );
+}
 
-    const isWav = bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46;
-    const mimeType = isWav ? 'audio/wav' : 'audio/mpeg';
+function stopAndInterruptPlayback() {
+  audioQueue.length = 0;
+  if (activeAudioSource) {
+    try {
+      activeAudioSource.stop();
+    } catch (e) {}
+    activeAudioSource = null;
+  }
+  isPlayingAudio = false;
+  socket.emit('interrupt');
+}
 
-    const audioBlob = new Blob([bytes.buffer], { type: mimeType });
-    const audioUrl = URL.createObjectURL(audioBlob);
-    const audio = new Audio(audioUrl);
-    currentPlayingAudio = audio;
+// =====================================================================
+// Core States (STANDBY, LISTENING, THINKING, SPEAKING)
+// =====================================================================
+let currentCoreState = 'STANDBY';
 
-    audio.onended = () => {
-      URL.revokeObjectURL(audioUrl);
-      if (currentPlayingAudio === audio) currentPlayingAudio = null;
-      playNextAudioChunk();
-    };
+function setCoreState(state) {
+  currentCoreState = state;
+  if (!arcReactor) return;
 
-    audio.onerror = (e) => {
-      console.warn('Audio element playback error:', e);
-      URL.revokeObjectURL(audioUrl);
-      if (currentPlayingAudio === audio) currentPlayingAudio = null;
-      playNextAudioChunk();
-    };
+  arcReactor.classList.remove('state-listening', 'state-thinking', 'state-speaking');
 
-    audio.play().catch((err) => {
-      console.warn('Audio play error:', err);
-      URL.revokeObjectURL(audioUrl);
-      if (currentPlayingAudio === audio) currentPlayingAudio = null;
-      playNextAudioChunk();
-    });
-  } catch (err) {
-    console.error('Error processing audio packet:', err);
-    playNextAudioChunk();
+  if (state === 'LISTENING') {
+    arcReactor.classList.add('state-listening');
+    if (voicePromptText) voicePromptText.textContent = 'ESCUCHANDO TU ORDEN...';
+    if (voiceSubtext) voiceSubtext.textContent = 'Habla ahora con naturalidad';
+    if (coreCenterNum) coreCenterNum.textContent = 'REC';
+  } else if (state === 'THINKING') {
+    arcReactor.classList.add('state-thinking');
+    if (voicePromptText) voicePromptText.textContent = 'PROCESANDO EN GROQ LLM...';
+    if (voiceSubtext) voiceSubtext.textContent = 'Consultando memoria e inferencia';
+    if (coreCenterNum) coreCenterNum.textContent = 'AI';
+  } else if (state === 'SPEAKING') {
+    arcReactor.classList.add('state-speaking');
+    if (voicePromptText) voicePromptText.textContent = 'E.V.I. RESPONDIENDO // CAMILA HD';
+    if (voiceSubtext) voiceSubtext.textContent = 'Haz clic en el núcleo para interrumpir';
+    if (coreCenterNum) coreCenterNum.textContent = 'VOZ';
+  } else {
+    if (voicePromptText) voicePromptText.textContent = 'TOCA EL NÚCLEO O PRESIONA [ESPACIO] PARA HABLAR';
+    if (voiceSubtext) voiceSubtext.textContent = 'Micrófono permanente activado // Audio 16kHz PCM';
+    if (coreCenterNum) coreCenterNum.textContent = '41';
   }
 }
 
 // =====================================================================
-// WebSocket Events
-// =====================================================================
-socket.on('connect', () => {
-  statusPulseDot.style.background = 'var(--accent-green)';
-  statusLabel.textContent = 'SISTEMA EN LÍNEA // GPU CUDA ACTIVA';
-});
-
-socket.on('disconnect', () => {
-  statusPulseDot.style.background = 'var(--neon-pink)';
-  statusLabel.textContent = 'DESCONECTADO DEL ORQUESTADOR';
-});
-
-let currentActiveMessageCard = null;
-
-socket.on('stt_transcription', (transcript) => {
-  if (transcript && transcript.trim()) {
-    appendUserMessage(transcript.trim());
-    setCoreState('THINKING');
-  }
-});
-
-socket.on('text_token', (token) => {
-  if (!currentActiveMessageCard) {
-    currentActiveMessageCard = createEviMessageCard();
-  }
-  const textContainer = currentActiveMessageCard.querySelector('.msg-text');
-  textContainer.textContent += token;
-  dialogueFeed.scrollTop = dialogueFeed.scrollHeight;
-});
-
-socket.on('audio_chunk', (base64Audio) => {
-  audioPlaybackQueue.push(base64Audio);
-  if (!isPlayingAudio) {
-    playNextAudioChunk();
-  }
-});
-
-socket.on('response_finished', () => {
-  currentActiveMessageCard = null;
-  if (!isPlayingAudio && audioPlaybackQueue.length === 0) {
-    setCoreState('STANDBY');
-  }
-});
-
-// =====================================================================
-// TTS Catalog & Real-time Voice Switcher
-// =====================================================================
-let ttsCatalogData = null;
-
-function renderTtsCatalog(catalog) {
-  ttsCatalogData = catalog;
-  if (!catalog || !catalog.engines || !ttsEngineSelect) return;
-
-  const active = catalog.active || { engine: 'edge', voice: 'es-PE-CamilaNeural', rate: '+20%' };
-
-  ttsEngineSelect.innerHTML = '';
-  catalog.engines.forEach((eng) => {
-    const opt = document.createElement('option');
-    opt.value = eng.id;
-    opt.textContent = eng.displayName;
-    if (eng.id === active.engine) {
-      opt.selected = true;
-    }
-    ttsEngineSelect.appendChild(opt);
-  });
-
-  updateVoiceDropdownForEngine(active.engine, active.voice);
-  updateRateSliderFromRateString(active.rate);
-  updateEngineBadge(active.engine, active.voice);
-}
-
-function updateVoiceDropdownForEngine(engineId, selectedVoiceId) {
-  if (!ttsCatalogData || !ttsVoiceSelect) return;
-  const engine = ttsCatalogData.engines.find((e) => e.id === engineId);
-  if (!engine) return;
-
-  ttsVoiceSelect.innerHTML = '';
-  engine.voices.forEach((v) => {
-    const opt = document.createElement('option');
-    opt.value = v.id;
-    opt.textContent = `${v.name} (${v.gender === 'female' ? 'F' : 'M'})`;
-    if (v.id === selectedVoiceId) {
-      opt.selected = true;
-    }
-    ttsVoiceSelect.appendChild(opt);
-  });
-
-  if (!selectedVoiceId && engine.voices.length > 0) {
-    ttsVoiceSelect.value = engine.voices[0].id;
-  }
-}
-
-function updateRateSliderFromRateString(rateStr) {
-  if (!rateStr || !ttsRateSlider) return;
-  const num = parseInt(rateStr.replace('%', '').replace('+', ''));
-  if (!isNaN(num)) {
-    ttsRateSlider.value = num;
-    if (ttsRateDisplay) ttsRateDisplay.textContent = num >= 0 ? `+${num}%` : `${num}%`;
-  }
-}
-
-function updateEngineBadge(engineId, voiceId) {
-  if (!ttsEngineBadgeText) return;
-  const engineName =
-    engineId === 'cosyvoice'
-      ? 'COSYVOICE 3'
-      : engineId === 'edge'
-      ? 'EDGE NEURAL'
-      : engineId === 'piper'
-      ? 'PIPER LOCAL'
-      : 'CHATTERBOX';
-  const cleanVoice = voiceId ? voiceId.replace('es-MX-', '').replace('es-US-', '').replace('es_MX-', '').replace('Neural', '').replace('cosy-es-', '') : '';
-  ttsEngineBadgeText.textContent = `${engineName} // ${cleanVoice.toUpperCase()}`;
-}
-
-// Event Listeners for Voice Toolbar (Safe with optional chaining)
-ttsEngineSelect?.addEventListener('change', () => {
-  const selectedEngine = ttsEngineSelect.value;
-  updateVoiceDropdownForEngine(selectedEngine);
-  const selectedVoice = ttsVoiceSelect?.value;
-  const rateVal = parseInt(ttsRateSlider?.value || '20');
-  const rateStr = rateVal >= 0 ? `+${rateVal}%` : `${rateVal}%`;
-
-  socket.emit('update_tts_settings', {
-    engine: selectedEngine,
-    voice: selectedVoice,
-    rate: rateStr,
-  });
-  updateEngineBadge(selectedEngine, selectedVoice);
-});
-
-ttsVoiceSelect?.addEventListener('change', () => {
-  const selectedVoice = ttsVoiceSelect.value;
-  socket.emit('update_tts_settings', { voice: selectedVoice });
-  updateEngineBadge(ttsEngineSelect?.value || 'edge', selectedVoice);
-});
-
-ttsRateSlider?.addEventListener('input', () => {
-  const rateVal = parseInt(ttsRateSlider.value);
-  const rateStr = rateVal >= 0 ? `+${rateVal}%` : `${rateVal}%`;
-  if (ttsRateDisplay) ttsRateDisplay.textContent = rateStr;
-});
-
-ttsRateSlider?.addEventListener('change', () => {
-  const rateVal = parseInt(ttsRateSlider.value);
-  const rateStr = rateVal >= 0 ? `+${rateVal}%` : `${rateVal}%`;
-  socket.emit('update_tts_settings', { rate: rateStr });
-});
-
-socket.on('tts_catalog', (catalog) => {
-  renderTtsCatalog(catalog);
-});
-
-socket.on('tts_config_updated', (cfg) => {
-  updateEngineBadge(cfg.engine, cfg.voice);
-});
-
-// LLM Engine Selector
-const llmProviderSelect = document.getElementById('llmProviderSelect');
-
-llmProviderSelect?.addEventListener('change', () => {
-  const val = llmProviderSelect.value;
-  if (val === 'groq') {
-    socket.emit('update_llm_settings', { provider: 'groq', model: 'openai/gpt-oss-120b' });
-  } else if (val === 'groq-20b') {
-    socket.emit('update_llm_settings', { provider: 'groq', model: 'openai/gpt-oss-20b' });
-  } else if (val === 'groq-qwen') {
-    socket.emit('update_llm_settings', { provider: 'groq', model: 'qwen/qwen3.6-27b' });
-  } else if (val === 'gemini') {
-    socket.emit('update_llm_settings', { provider: 'gemini', model: 'gemini-2.0-flash' });
-  } else if (val === 'local') {
-    socket.emit('update_llm_settings', { provider: 'local' });
-  }
-});
-
-socket.on('llm_config', (cfg) => {
-  if (cfg && cfg.provider) {
-    const providerVal = document.getElementById('llmProviderVal');
-    const modelVal = document.getElementById('llmModelVal');
-    if (providerVal) providerVal.textContent = cfg.provider.toUpperCase();
-    if (modelVal) modelVal.textContent = cfg.model ? cfg.model.toUpperCase() : 'AUTO';
-  }
-});
-
-socket.on('llm_config_updated', (cfg) => {
-  if (cfg && cfg.provider) {
-    const providerVal = document.getElementById('llmProviderVal');
-    const modelVal = document.getElementById('llmModelVal');
-    if (providerVal) providerVal.textContent = cfg.provider.toUpperCase();
-    if (modelVal) modelVal.textContent = cfg.model ? cfg.model.toUpperCase() : 'AUTO';
-  }
-});
-
-// =====================================================================
-// Real-Time System Hardware Telemetry
+// Circular Tachometers & System Metrics
 // =====================================================================
 const cpuBadge = document.getElementById('cpuBadge');
 const cpuModel = document.getElementById('cpuModel');
 const cpuCores = document.getElementById('cpuCores');
-const cpuProgress = document.getElementById('cpuProgress');
+const cpuGaugeArc = document.getElementById('cpuGaugeArc');
+const cpuGaugeVal = document.getElementById('cpuGaugeVal');
 
 const gpuBadge = document.getElementById('gpuBadge');
 const gpuLoad = document.getElementById('gpuLoad');
-const gpuProgress = document.getElementById('gpuProgress');
+const gpuGaugeArc = document.getElementById('gpuGaugeArc');
 const gpuVram = document.getElementById('gpuVram');
-const vramProgress = document.getElementById('vramProgress');
 const gpuTemp = document.getElementById('gpuTemp');
 
 const ramBadge = document.getElementById('ramBadge');
 const ramUsage = document.getElementById('ramUsage');
-const ramProgress = document.getElementById('ramProgress');
+const ramGaugeArc = document.getElementById('ramGaugeArc');
+const ramGaugeVal = document.getElementById('ramGaugeVal');
+
+function setGaugePercent(arcElem, percent) {
+  if (!arcElem) return;
+  const circumference = 390;
+  const p = Math.min(100, Math.max(0, percent || 0));
+  const offset = circumference - (circumference * p) / 100;
+  arcElem.style.strokeDashoffset = offset;
+}
 
 socket.on('system_metrics', (m) => {
   if (!m) return;
   if (m.cpu) {
     if (cpuBadge) cpuBadge.textContent = `${m.cpu.usagePercent}%`;
-    if (cpuProgress) cpuProgress.style.width = `${m.cpu.usagePercent}%`;
+    if (cpuGaugeVal) cpuGaugeVal.textContent = `${m.cpu.usagePercent}%`;
+    setGaugePercent(cpuGaugeArc, m.cpu.usagePercent);
     if (cpuModel && m.cpu.model) cpuModel.textContent = m.cpu.model.split(' ')[0] + ' ' + (m.cpu.model.split(' ')[1] || '');
     if (cpuCores) cpuCores.textContent = `${m.cpu.cores} Cores`;
   }
   if (m.gpu) {
     if (gpuLoad) gpuLoad.textContent = `${m.gpu.utilizationPercent}%`;
-    if (gpuProgress) gpuProgress.style.width = `${m.gpu.utilizationPercent}%`;
+    setGaugePercent(gpuGaugeArc, m.gpu.utilizationPercent);
     if (gpuVram) gpuVram.textContent = `${(m.gpu.memoryUsedMb / 1024).toFixed(1)} / ${(m.gpu.memoryTotalMb / 1024).toFixed(1)} GB`;
-    if (vramProgress) vramProgress.style.width = `${Math.min(100, Math.round((m.gpu.memoryUsedMb / m.gpu.memoryTotalMb) * 100))}%`;
     if (gpuTemp) gpuTemp.textContent = `${m.gpu.temperatureC}°C`;
   }
   if (m.ram) {
     if (ramBadge) ramBadge.textContent = `${m.ram.percent}%`;
-    if (ramUsage) ramUsage.textContent = `${m.ram.usedGb} GB / ${m.ram.totalGb} GB`;
-    if (ramProgress) ramProgress.style.width = `${m.ram.percent}%`;
+    if (ramGaugeVal) ramGaugeVal.textContent = `${m.ram.percent}%`;
+    setGaugePercent(ramGaugeArc, m.ram.percent);
+    if (ramUsage) ramUsage.textContent = `${m.ram.usedGb} / ${m.ram.totalGb} GB`;
   }
+});
+
+// Live Weather Updates (Chiclayo)
+socket.on('live_weather_update', (data) => {
+  if (!data) return;
+  const tempElem = document.getElementById('headerWeatherTemp');
+  const condElem = document.getElementById('headerWeatherCondition');
+  if (tempElem && data.temp !== undefined) tempElem.textContent = `${data.temp}°C`;
+  if (condElem && data.condition) condElem.textContent = data.condition.toUpperCase();
 });
 
 // Google Workspace Status
@@ -582,6 +280,7 @@ socket.on('ack_mode_updated', (data) => {
 // Dialogue UI Helpers (Max 2 Visible Subtitle Turns with Fade-Out)
 // =====================================================================
 function maintainMaxTwoMessages() {
+  if (!dialogueFeed) return;
   const cards = Array.from(dialogueFeed.querySelectorAll('.message-card:not(.fading-out)'));
   if (cards.length > 2) {
     const toRemoveCount = cards.length - 2;
@@ -648,16 +347,22 @@ if (SpeechRecognition) {
   webSpeechRecognition.interimResults = true;
 
   webSpeechRecognition.onresult = (event) => {
-    const transcript = Array.from(event.results).map(r => r[0].transcript).join('');
-    voicePromptText.textContent = `ESCUCHANDO: "${transcript}"`;
-    if (event.results[0].isFinal) {
-      stopVoiceCapture();
-      sendTextMessage(transcript);
+    let interim = '';
+    let final = '';
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      if (event.results[i].isFinal) {
+        final += event.results[i][0].transcript;
+      } else {
+        interim += event.results[i][0].transcript;
+      }
+    }
+    if (final) {
+      sendVoiceQuery(final);
     }
   };
 
   webSpeechRecognition.onerror = (e) => {
-    console.warn('Web Speech Error:', e);
+    console.warn('Speech recognition error:', e.error);
     stopVoiceCapture();
   };
 
@@ -677,30 +382,36 @@ function startVoiceCapture() {
   if (webSpeechRecognition) {
     try {
       webSpeechRecognition.start();
-    } catch (e) {
-      console.warn('Recognition already started:', e);
-    }
+    } catch (e) {}
   }
 }
 
 function stopVoiceCapture() {
-  if (!isRecording) return;
   isRecording = false;
-
   if (webSpeechRecognition) {
     try {
       webSpeechRecognition.stop();
     } catch (e) {}
   }
-
   if (currentCoreState === 'LISTENING') {
     setCoreState('STANDBY');
   }
 }
 
-voiceCoreBtn.addEventListener('click', () => {
+function sendVoiceQuery(text) {
+  const query = text.trim();
+  if (!query) return;
+
+  stopVoiceCapture();
+  appendUserMessage(query);
+  setCoreState('THINKING');
+  socket.emit('voice_command_text', query);
+}
+
+// Arc Reactor Click Listener
+arcReactor?.addEventListener('click', () => {
+  initAudioContext();
   if (currentCoreState === 'SPEAKING' || isPlayingAudio) {
-    // Si EVI está hablando, el clic la interrumpe inmediatamente y abre el micrófono
     stopAndInterruptPlayback();
     startVoiceCapture();
   } else if (!isRecording) {
@@ -710,40 +421,16 @@ voiceCoreBtn.addEventListener('click', () => {
   }
 });
 
-// =====================================================================
-// Text Messaging & Keyboard Shortcuts
-// =====================================================================
-function sendTextMessage(text) {
-  stopAndInterruptPlayback();
-  const query = (text || queryInput.value).trim();
-  if (!query) return;
-
-  initAudioContext();
-  appendUserMessage(query);
-  setCoreState('THINKING');
-  socket.emit('voice_command_text', query);
-
-  if (!text) queryInput.value = '';
-}
-
-sendTextBtn.addEventListener('click', () => sendTextMessage());
-queryInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    sendTextMessage();
-  }
-});
-
 // Push-to-talk con Barra Espaciadora
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space' && document.activeElement !== queryInput && !isRecording) {
+  if (e.code === 'Space' && !isRecording) {
     e.preventDefault();
     startVoiceCapture();
   }
 });
 
 window.addEventListener('keyup', (e) => {
-  if (e.code === 'Space' && document.activeElement !== queryInput && isRecording) {
+  if (e.code === 'Space' && isRecording) {
     e.preventDefault();
     stopVoiceCapture();
   }
@@ -753,13 +440,72 @@ window.addEventListener('keyup', (e) => {
 document.querySelectorAll('.chip-btn-cyber').forEach(btn => {
   btn.addEventListener('click', () => {
     const query = btn.getAttribute('data-query');
-    if (query) sendTextMessage(query);
+    if (query) {
+      initAudioContext();
+      stopAndInterruptPlayback();
+      appendUserMessage(query);
+      setCoreState('THINKING');
+      socket.emit('voice_command_text', query);
+    }
   });
 });
 
-clearStreamBtn?.addEventListener('click', () => {
-  if (dialogueFeed) dialogueFeed.innerHTML = '';
-  socket.emit('clear_history');
+// =====================================================================
+// Socket Streaming & Welcome Briefing
+// =====================================================================
+let currentEviCard = null;
+let currentEviTextElem = null;
+
+socket.on('text_token', (token) => {
+  if (currentCoreState !== 'SPEAKING') {
+    setCoreState('SPEAKING');
+  }
+  if (!currentEviCard) {
+    currentEviCard = createEviMessageCard();
+    currentEviTextElem = currentEviCard.querySelector('.msg-text');
+  }
+  if (currentEviTextElem) {
+    currentEviTextElem.textContent += token;
+  }
+});
+
+socket.on('stream_end', () => {
+  currentEviCard = null;
+  currentEviTextElem = null;
+});
+
+socket.on('audio_chunk', (base64Audio) => {
+  const binaryString = window.atob(base64Audio);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  audioQueue.push(bytes);
+  if (!isPlayingAudio) {
+    playNextInQueue();
+  }
+});
+
+// Button Refresh Briefing
+btnRefreshBriefing?.addEventListener('click', () => {
+  initAudioContext();
+  stopAndInterruptPlayback();
+  socket.emit('request_welcome_briefing');
+});
+
+// Auto Welcome Briefing on Connect
+let hasRequestedWelcome = false;
+socket.on('connect', () => {
+  statusPulseDot?.classList.add('connected');
+  if (statusLabel) statusLabel.textContent = 'QUANTUM CORE ONLINE // CHICLAYO HUB';
+  
+  if (!hasRequestedWelcome) {
+    hasRequestedWelcome = true;
+    setTimeout(() => {
+      socket.emit('request_welcome_briefing');
+    }, 500);
+  }
 });
 
 // =====================================================================
@@ -767,24 +513,21 @@ clearStreamBtn?.addEventListener('click', () => {
 // =====================================================================
 syncRagBtn?.addEventListener('click', () => {
   const span = syncRagBtn.querySelector('span');
-  if (span) span.textContent = 'SINCRONIZANDO...';
+  if (span) span.textContent = 'SYNC...';
   socket.emit('sync_knowledge');
   setTimeout(() => {
-    if (span) span.textContent = 'SYNC RAG';
+    if (span) span.textContent = '⚡ RAG';
   }, 2000);
 });
 
 openMemoryModalBtn?.addEventListener('click', () => {
-  memoryModal?.classList.add('active');
+  memoryModal?.classList.add('open');
   loadMemoriesList();
 });
 
-function closeModal() {
-  memoryModal?.classList.remove('active');
-}
-
-closeModalBtn?.addEventListener('click', closeModal);
-modalOverlay?.addEventListener('click', closeModal);
+closeMemoryModalBtn?.addEventListener('click', () => {
+  memoryModal?.classList.remove('open');
+});
 
 saveMemoryBtn?.addEventListener('click', () => {
   const text = newMemoryInput?.value.trim();
@@ -813,7 +556,7 @@ function loadMemoriesList() {
         item.className = 'memory-item';
         item.innerHTML = `
           <span>${escapeHtml(m.content || m.text || '')}</span>
-          <span style="color:var(--neon-pink);font-size:10px;font-family:var(--font-mono);">${new Date(m.created_at || Date.now()).toLocaleDateString()}</span>
+          <span style="color:var(--neon-pink);font-size:9.5px;font-family:var(--font-mono);">${new Date(m.created_at || Date.now()).toLocaleDateString()}</span>
         `;
         memoryItemsContainer.appendChild(item);
       });

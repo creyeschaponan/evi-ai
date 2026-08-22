@@ -136,6 +136,73 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { success: false };
   }
 
+  @SubscribeMessage('request_welcome_briefing')
+  async handleWelcomeBriefing(@ConnectedSocket() client: Socket) {
+    this.logger.log(`🌟 [WELCOME BRIEFING REQUESTED] for client ${client.id}...`);
+
+    const now = new Date();
+    const hourNum = parseInt(
+      now.toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', hour12: false }),
+      10,
+    );
+    let saludo = 'Buenas noches';
+    if (hourNum >= 5 && hourNum < 12) saludo = 'Buenos días';
+    else if (hourNum >= 12 && hourNum < 19) saludo = 'Buenas tardes';
+
+    const fechaStr = now.toLocaleDateString('es-PE', {
+      timeZone: 'America/Lima',
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    });
+
+    let climaTexto = 'en Chiclayo tenemos una temperatura agradable';
+    let tempNum = 22;
+    let conditionStr = 'Despejado';
+    try {
+      const weather = await this.weatherService.getLiveWeather('Chiclayo');
+      if (weather) {
+        tempNum = Math.round(weather.temperature);
+        conditionStr = weather.condition;
+        climaTexto = `en Chiclayo tenemos ${tempNum} grados con ${weather.condition.toLowerCase()}`;
+      }
+    } catch (wErr: any) {
+      this.logger.warn(`Could not get weather for briefing: ${wErr.message}`);
+    }
+
+    // Emitir datos de clima a la UI para el widget
+    client.emit('live_weather_update', {
+      city: 'Chiclayo',
+      temp: tempNum,
+      condition: conditionStr,
+    });
+
+    let correosTexto = 'tu bandeja de entrada está al día';
+    if (this.googleAuth.isConfigured()) {
+      try {
+        const gmailRes = await this.googleMcpService.queryGmail('¿Cuántos correos nuevos o recientes tengo hoy?');
+        if (gmailRes && gmailRes.text) {
+          correosTexto = gmailRes.text;
+        }
+      } catch (gErr: any) {
+        this.logger.warn(`Gmail check for briefing failed: ${gErr.message}`);
+      }
+    }
+
+    const briefingText = `${saludo}, Cristian. Hoy es ${fechaStr}. ${climaTexto.charAt(0).toUpperCase() + climaTexto.slice(1)} y todos tus sistemas están listos. Que tengas una linda y productiva jornada.`;
+
+    client.emit('text_token', briefingText);
+    try {
+      const audioBuf = await this.ttsService.synthesizeSentence(briefingText);
+      if (audioBuf && audioBuf.length > 0) {
+        client.emit('audio_chunk', audioBuf.toString('base64'));
+      }
+    } catch (ttsErr: any) {
+      this.logger.warn(`Welcome briefing TTS error: ${ttsErr.message}`);
+    }
+    return { success: true, text: briefingText };
+  }
+
   @SubscribeMessage('interrupt')
   handleInterrupt(@ConnectedSocket() client: Socket) {
     const controller = this.activeAbortControllers.get(client.id);

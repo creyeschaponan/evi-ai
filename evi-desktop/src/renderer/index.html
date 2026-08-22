@@ -3,43 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EVI Desktop — Enhanced Virtual Intelligence</title>
+  <title>EVI Desktop — S.H.I.E.L.D. OS / Iron Man HUD</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;1,400&family=Orbitron:wght@400;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;1,400&family=Orbitron:wght@400;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  <script src="vendor/socket.io.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body>
-  <!-- Custom Frameless Titlebar para Windows -->
-  <div class="custom-titlebar">
-    <div class="titlebar-drag-region">
-      <div class="titlebar-brand">
-        <img src="../../assets/tray-icon.png" alt="EVI" class="titlebar-icon">
-        <span class="titlebar-title">E.V.I. // DESKTOP SYSTEM HUD</span>
-        <span class="titlebar-version">v3.0</span>
-      </div>
-    </div>
-    <div class="titlebar-controls">
-      <button class="titlebar-btn" id="btnMinimize" title="Minimizar a barra de tareas">
-        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-      </button>
-      <button class="titlebar-btn" id="btnMaximize" title="Maximizar ventana">
-        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="4" y="4" width="16" height="16" rx="2"></rect>
-        </svg>
-      </button>
-      <button class="titlebar-btn btn-close" id="btnClose" title="Ocultar en segundo plano (Bandeja del sistema)">
-        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
-    </div>
-  </div>
-
   <!-- Fondo Holográfico Cyberpunk con Rejilla y Partículas -->
   <div class="hologram-background">
     <div class="grid-overlay"></div>
@@ -50,184 +21,170 @@
   </div>
 
   <div class="hud-container">
-    <!-- Header Táctico HUD Jarvis / Cyberpunk -->
-    <header class="hud-header">
-      <div class="header-left">
-        <div class="brand-badge">
-          <span class="hud-corner top-left"></span>
-          <span class="hud-corner bottom-right"></span>
-          <div class="brand-icon">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-              <polyline points="2 17 12 22 22 17"></polyline>
-              <polyline points="2 12 12 17 22 12"></polyline>
+    <!-- Header Táctico S.H.I.E.L.D. OS con Reloj Espejo, Clima y Controles -->
+    <header class="hud-header shield-top-bar">
+      <!-- Reloj Digital Gigante con Efecto Reflejo (S.H.I.E.L.D. Style) -->
+      <div class="header-clock-section">
+        <div class="clock-date-banner" id="clockDateDisplay">CARGANDO FECHA...</div>
+        <div class="clock-display-wrapper">
+          <div class="clock-main-digits">
+            <span id="clockTimeDigits">--:--</span>
+            <span class="clock-ampm-badge" id="clockAmPm">--</span>
+          </div>
+          <div class="clock-reflection-mirror" id="clockReflection">--:-- --</div>
+        </div>
+      </div>
+
+      <!-- Emblema Central S.H.I.E.L.D. / E.V.I. OS -->
+      <div class="header-center-emblem">
+        <div class="shield-badge-container">
+          <div class="shield-icon-wrapper">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/>
+              <path d="M12 6v12M8 10l4-4 4 4"/>
             </svg>
           </div>
-          <div>
-            <h1 class="brand-title">E.V.I. <span class="brand-version">DESKTOP</span></h1>
-            <p class="brand-subtitle">JARVIS CYBERPUNK HUD // ALWAYS-ON VOICE AI</p>
+          <div class="shield-text-meta">
+            <span class="shield-title">E.V.I. // S.H.I.E.L.D. TACTICAL OS</span>
+            <span class="shield-status-line">
+              <span class="status-pulse-dot" id="statusPulseDot"></span>
+              <span id="statusLabel">QUANTUM CORE ONLINE // CHICLAYO HUB</span>
+            </span>
           </div>
         </div>
       </div>
 
-      <div class="header-center">
-        <div class="status-pill" id="connectionStatusPill">
-          <span class="pulse-dot" id="statusPulseDot"></span>
-          <span id="statusLabel">SISTEMA EN LÍNEA // GPU CUDA ACTIVA</span>
-        </div>
-      </div>
-
-      <div class="header-right">
-        <!-- Switch Modo Alexa / Push-to-Talk -->
-        <div class="mode-toggle-deck" id="modeToggleContainer">
-          <button class="hud-btn-mode active-alexa" id="toggleListeningModeBtn" title="Cambiar modo de escucha (Alexa vs Push-to-Talk)">
-            <span class="mode-icon" id="modeIcon">🎙️</span>
-            <span class="mode-label" id="modeLabel">MODO ALEXA ("EVI")</span>
-          </button>
+      <!-- Módulo de Clima en Chiclayo & Botones de Control -->
+      <div class="header-right-deck">
+        <!-- Weather Card Chiclayo -->
+        <div class="shield-weather-card" id="headerWeatherCard">
+          <div class="weather-icon-badge">☀️</div>
+          <div class="weather-meta">
+            <div class="weather-temp-row">
+              <span class="weather-temp" id="headerWeatherTemp">22°C</span>
+              <span class="weather-location">CHICLAYO</span>
+            </div>
+            <span class="weather-cond-desc" id="headerWeatherCondition">DESPEJADO</span>
+          </div>
         </div>
 
-        <button class="hud-btn-cyber pink" id="syncRagBtn" title="Sincronizar base de conocimiento con pgvector">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-          </svg>
-          <span>SYNC RAG</span>
+        <button class="shield-action-btn pink" id="btnRefreshBriefing" title="Escuchar Saludo Diario de Bienvenida de EVI">
+          <span>🔊 SALUDO</span>
         </button>
-        <button class="hud-btn-cyber cyan" id="openMemoryModalBtn" title="Consultar y gestionar memorias">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 15h-2v-6h2zm0-8h-2V7h2z"/>
-          </svg>
-          <span>MEMORIA</span>
+        <button class="shield-action-btn cyan" id="openMemoryModalBtn" title="Consultar Memorias Persistentes">
+          <span>🧠 MEMORIA</span>
         </button>
-        <button class="hud-btn-cyber purple" id="openSettingsModalBtn" title="Configuración de EVI Desktop">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-          <span>AJUSTES</span>
+        <button class="shield-action-btn purple" id="syncRagBtn" title="Sincronizar Documentos RAG">
+          <span>⚡ RAG</span>
         </button>
       </div>
     </header>
 
-    <!-- Main Cockpit: Fullscreen Cyberpunk HUD with Left & Right Flanks -->
+    <!-- Main Cockpit: Fullscreen S.H.I.E.L.D. / Iron Man HUD -->
     <main class="hud-main-fullscreen">
-      <!-- FLANK IZQUIERDO: Monitoreo de Hardware y Recursos en Tiempo Real -->
+      <!-- FLANK IZQUIERDO: Tacómetros Circulares de CPU y RAM -->
       <aside class="hud-flank flank-left">
-        <!-- CPU Card -->
-        <div class="hud-widget">
+        <!-- CPU Tachometer Dial -->
+        <div class="hud-widget circular-gauge-widget">
           <div class="widget-header">
             <span class="widget-icon">⚡</span>
             <span class="widget-title">CPU // PROCESADOR</span>
-            <span class="widget-badge" id="cpuBadge">12%</span>
+            <span class="widget-badge" id="cpuBadge">0%</span>
           </div>
-          <div class="widget-body">
-            <div class="metric-row">
+          <div class="widget-body center-gauge">
+            <div class="gauge-svg-container">
+              <svg viewBox="0 0 160 160" class="circular-dial-svg">
+                <!-- Track de fondo -->
+                <circle cx="80" cy="80" r="62" class="dial-track"/>
+                <!-- Ticks radiales -->
+                <circle cx="80" cy="80" r="54" class="dial-ticks"/>
+                <!-- Arco de progreso -->
+                <circle cx="80" cy="80" r="62" class="dial-progress-arc cyan" id="cpuGaugeArc"
+                  stroke-dasharray="390" stroke-dashoffset="390"/>
+              </svg>
+              <div class="gauge-center-readout">
+                <span class="gauge-main-val" id="cpuGaugeVal">0%</span>
+                <span class="gauge-sub-label" id="cpuCores">-- Cores</span>
+              </div>
+            </div>
+            <div class="metric-footer-row">
               <span class="metric-label">MODELO:</span>
-              <span class="metric-val" id="cpuModel">Multi-Core</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">NÚCLEOS:</span>
-              <span class="metric-val" id="cpuCores">-- Cores</span>
-            </div>
-            <div class="cyber-progress-bar">
-              <div class="progress-fill cyan" id="cpuProgress" style="width: 12%"></div>
+              <span class="metric-val cyan" id="cpuModel">Multi-Core</span>
             </div>
           </div>
         </div>
 
-        <!-- NVIDIA GPU RTX 3060 Card -->
-        <div class="hud-widget">
-          <div class="widget-header">
-            <span class="widget-icon">🎮</span>
-            <span class="widget-title">NVIDIA RTX 3060 CUDA</span>
-            <span class="widget-badge pink" id="gpuBadge">CUDA OK</span>
-          </div>
-          <div class="widget-body">
-            <div class="metric-row">
-              <span class="metric-label">CARGA GPU:</span>
-              <span class="metric-val pink" id="gpuLoad">0%</span>
-            </div>
-            <div class="cyber-progress-bar">
-              <div class="progress-fill pink" id="gpuProgress" style="width: 15%"></div>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">VRAM USADA:</span>
-              <span class="metric-val" id="gpuVram">2.7 / 12.0 GB</span>
-            </div>
-            <div class="cyber-progress-bar">
-              <div class="progress-fill purple" id="vramProgress" style="width: 23%"></div>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">TEMPERATURA:</span>
-              <span class="metric-val green" id="gpuTemp">45°C</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- RAM Card -->
-        <div class="hud-widget">
+        <!-- RAM Tachometer Dial -->
+        <div class="hud-widget circular-gauge-widget">
           <div class="widget-header">
             <span class="widget-icon">💾</span>
-            <span class="widget-title">MEMORIA RAM</span>
-            <span class="widget-badge" id="ramBadge">28%</span>
+            <span class="widget-title">RAM // MEMORIA FÍSICA</span>
+            <span class="widget-badge purple" id="ramBadge">0%</span>
           </div>
-          <div class="widget-body">
-            <div class="metric-row">
-              <span class="metric-label">USO TOTAL:</span>
-              <span class="metric-val" id="ramUsage">8.5 GB / 32.0 GB</span>
+          <div class="widget-body center-gauge">
+            <div class="gauge-svg-container">
+              <svg viewBox="0 0 160 160" class="circular-dial-svg">
+                <circle cx="80" cy="80" r="62" class="dial-track"/>
+                <circle cx="80" cy="80" r="54" class="dial-ticks"/>
+                <circle cx="80" cy="80" r="62" class="dial-progress-arc purple" id="ramGaugeArc"
+                  stroke-dasharray="390" stroke-dashoffset="390"/>
+              </svg>
+              <div class="gauge-center-readout">
+                <span class="gauge-main-val" id="ramGaugeVal">0%</span>
+                <span class="gauge-sub-label">USADA</span>
+              </div>
             </div>
-            <div class="cyber-progress-bar">
-              <div class="progress-fill cyan" id="ramProgress" style="width: 28%"></div>
+            <div class="metric-footer-row">
+              <span class="metric-label">USO:</span>
+              <span class="metric-val purple" id="ramUsage">0.0 / 0.0 GB</span>
             </div>
           </div>
         </div>
 
-        <!-- Audio VU / VAD Card -->
+        <!-- Audio VU / Network Meter -->
         <div class="hud-widget">
           <div class="widget-header">
-            <span class="widget-icon">🎙️</span>
-            <span class="widget-title">ENTRADA DE AUDIO // VAD</span>
-            <span class="widget-badge green" id="vadBadge">ACTIVO</span>
+            <span class="widget-icon">📡</span>
+            <span class="widget-title">AUDIO // ENLACE CUÁNTICO</span>
+            <span class="widget-badge green">16kHz PCM</span>
           </div>
           <div class="widget-body">
-            <div class="metric-row">
-              <span class="metric-label">MUESTREO:</span>
-              <span class="metric-val cyan">16kHz PCM</span>
+            <div class="audio-vu-meter-cyber" id="audioVuMeter">
+              <div class="vu-bar"></div>
+              <div class="vu-bar"></div>
+              <div class="vu-bar"></div>
+              <div class="vu-bar"></div>
+              <div class="vu-bar"></div>
+              <div class="vu-bar"></div>
+              <div class="vu-bar"></div>
+              <div class="vu-bar"></div>
+              <div class="vu-bar"></div>
+              <div class="vu-bar"></div>
             </div>
-            <div class="metric-row">
-              <span class="metric-label">SUPRESIÓN RUIDO:</span>
-              <span class="metric-val green">SILERO VAD</span>
+            <div class="metric-footer-row" style="margin-top: 8px;">
+              <span class="metric-label">VAD ENTRADA:</span>
+              <span class="metric-val green" id="vadStatus">ACTIVO</span>
             </div>
           </div>
         </div>
       </aside>
 
-      <!-- CENTRO: ARC REACTOR + SUBTÍTULOS DE 2 TURNOS + INPUT DECK -->
+      <!-- STAGE CENTRAL: Segmented Multi-Ring Holographic Arc Reactor -->
       <section class="hud-center-stage">
-        <!-- Reactor Holográfico Central (Jarvis Arc Reactor Style) -->
-        <div class="reactor-wrapper">
-          <div class="hud-ring ring-outer"></div>
-          <div class="hud-ring ring-middle"></div>
-          <div class="hud-ring ring-inner"></div>
-          <div class="hud-ring ring-ticks"></div>
-
-          <!-- Canvas para Ondas de Audio en Tiempo Real -->
-          <canvas id="visualizerCanvas" class="visualizer-canvas" width="420" height="420"></canvas>
-
-          <!-- Núcleo Central Interactivo -->
-          <div class="core-center" id="voiceCoreBtn" title="Presiona o di 'EVI' para hablar">
-            <div class="core-spider-logo">
-              <svg viewBox="0 0 100 100" class="spider-svg">
-                <circle cx="50" cy="50" r="44" stroke="currentColor" stroke-width="1.5" fill="none" stroke-dasharray="4 6" />
-                <polygon points="50,14 66,28 66,72 50,86 34,72 34,28" fill="rgba(255, 0, 127, 0.18)" stroke="currentColor" stroke-width="2"/>
-                <circle cx="50" cy="50" r="16" fill="url(#coreGlowPink)" stroke="currentColor" stroke-width="2"/>
-                <defs>
-                  <radialGradient id="coreGlowPink" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="#ff007f" stop-opacity="0.95"/>
-                    <stop offset="70%" stop-color="#8b5cf6" stop-opacity="0.6"/>
-                    <stop offset="100%" stop-color="#00f0ff" stop-opacity="0.2"/>
-                  </radialGradient>
-                </defs>
-              </svg>
+        <!-- Contenedor del Arc Reactor Holográfico S.H.I.E.L.D. -->
+        <div class="arc-reactor-super-container">
+          <div class="arc-reactor-core" id="arcReactor" title="Toca el Núcleo para Hablar con EVI">
+            <div class="core-outer-ring"></div>
+            <div class="core-segmented-ring-left"></div>
+            <div class="core-segmented-ring-right"></div>
+            <div class="core-tick-scale-ring"></div>
+            <div class="core-rotating-ring-1"></div>
+            <div class="core-rotating-ring-2"></div>
+            <div class="core-plasma-chamber">
+              <div class="core-center-display">
+                <span class="core-status-num" id="coreCenterNum">41</span>
+                <span class="core-status-text">E.V.I.</span>
+              </div>
             </div>
             <div class="core-pulse-wave"></div>
           </div>
@@ -235,38 +192,38 @@
 
         <!-- Feedback de Voz y Estado -->
         <div class="voice-state-feedback">
-          <div class="voice-prompt-text" id="voicePromptText">DI "EVI" O PRESIONA [ESPACIO] PARA HABLAR</div>
-          <div class="voice-subtext" id="voiceSubtext">Escucha continua activa // Modo Alexa operativo</div>
+          <div class="voice-prompt-text" id="voicePromptText">TOCA EL NÚCLEO O PRESIONA [ESPACIO] PARA HABLAR</div>
+          <div class="voice-subtext" id="voiceSubtext">Micrófono permanente activado // Audio 16kHz PCM</div>
         </div>
 
-        <!-- Feed de Conversación Flotante (Solo 2 turnos visibles que se desplazan elegantemente) -->
+        <!-- Feed de Conversación Flotante (Solo 2 turnos con desplazamiento elegante) -->
         <div class="dialogue-feed-floating" id="dialogueFeed">
           <div class="message-card evi-message">
             <div class="msg-avatar">EVI</div>
             <div class="msg-content">
               <div class="msg-sender">E.V.I. <span class="msg-time" id="initTime"></span></div>
-              <div class="msg-text">Todos los sistemas locales y en la nube están operativos. Estoy atenta: solo di "EVI" o escribe cuando gustes.</div>
+              <div class="msg-text">Todos los sistemas de S.H.I.E.L.D. OS y EVI están operativos. Puedes hablarme o tocar el reactor cuando gustes.</div>
             </div>
           </div>
         </div>
 
-        <!-- Chips de Comandos Rápidos -->
+        <!-- Chips de Comandos Rápidos con Estilo Cyberpunk -->
         <div class="quick-chips-bar">
           <button class="chip-btn-cyber" data-query="EVI, ¿qué correos tengo hoy? Dame un resumen de todos mis correos de hoy">✉️ Mis Correos de Hoy</button>
           <button class="chip-btn-cyber" data-query="EVI, ¿qué eventos o reuniones tengo en mi calendario hoy?">📅 Agenda de Hoy</button>
-          <button class="chip-btn-cyber" data-query="¿Cómo está el clima hoy en Lima?">🌦️ Clima en Lima</button>
+          <button class="chip-btn-cyber" data-query="¿Cómo está el clima hoy en Chiclayo?">🌦️ Clima en Chiclayo</button>
           <button class="chip-btn-cyber" data-query="¿Cómo están los recursos del sistema y hardware?">⚡ Estado GPU / RAM</button>
           <button class="chip-btn-cyber" data-query="Pon música para programar en YouTube">🎵 Música en YouTube</button>
           <button class="chip-btn-cyber" data-query="¿Qué recuerdas sobre mí y mis preferencias?">🧠 Mis Preferencias</button>
         </div>
 
-        <!-- Voice Interaction Status & Keyboard Hints -->
+        <!-- Voice Interaction Status Indicator -->
         <div class="voice-hud-indicator">
           <span>🎙️ Di <kbd>EVI</kbd> // Mantén <kbd>ESPACIO</kbd> // Clic en el Arc Reactor</span>
         </div>
       </section>
 
-      <!-- FLANK DERECHO: Telemetría de Inteligencia Artificial y Pipeline -->
+      <!-- FLANK DERECHO: GPU RTX 3060, Google MCP & Latency Masking -->
       <aside class="hud-flank flank-right">
         <!-- Switch Selector de Aviso Previo (Latency Masking) -->
         <div class="hud-widget ack-mode-widget">
@@ -286,6 +243,33 @@
             <div class="metric-row" style="margin-top: 8px;">
               <span class="metric-label">MODO ACTIVO:</span>
               <span class="metric-val cyan" id="ackModeLabel">PRE-LLM DINÁMICO</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- NVIDIA GPU RTX 3060 Tachometer Dial -->
+        <div class="hud-widget circular-gauge-widget">
+          <div class="widget-header">
+            <span class="widget-icon">🎮</span>
+            <span class="widget-title">NVIDIA RTX 3060 CUDA</span>
+            <span class="widget-badge pink" id="gpuBadge">CUDA OK</span>
+          </div>
+          <div class="widget-body center-gauge">
+            <div class="gauge-svg-container">
+              <svg viewBox="0 0 160 160" class="circular-dial-svg">
+                <circle cx="80" cy="80" r="62" class="dial-track"/>
+                <circle cx="80" cy="80" r="54" class="dial-ticks"/>
+                <circle cx="80" cy="80" r="62" class="dial-progress-arc pink" id="gpuGaugeArc"
+                  stroke-dasharray="390" stroke-dashoffset="390"/>
+              </svg>
+              <div class="gauge-center-readout">
+                <span class="gauge-main-val" id="gpuLoad">0%</span>
+                <span class="gauge-sub-label" id="gpuTemp">--°C</span>
+              </div>
+            </div>
+            <div class="metric-footer-row">
+              <span class="metric-label">VRAM USADA:</span>
+              <span class="metric-val pink" id="gpuVram">0.0 / 12.0 GB</span>
             </div>
           </div>
         </div>
@@ -334,77 +318,8 @@
               <span class="metric-val green">~800 TOK/S</span>
             </div>
             <div class="metric-row">
-              <span class="metric-label">LATENCIA TOKEN:</span>
-              <span class="metric-val cyan">~490 ms</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- TTS Synthesizer Widget -->
-        <div class="hud-widget">
-          <div class="widget-header">
-            <span class="widget-icon">🔊</span>
-            <span class="widget-title">SÍNTESIS // VOZ NEURAL</span>
-            <span class="widget-badge cyan">24kHz HD</span>
-          </div>
-          <div class="widget-body">
-            <div class="metric-row">
-              <span class="metric-label">MOTOR:</span>
-              <span class="metric-val cyan">MICROSOFT NEURAL</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">VOZ:</span>
-              <span class="metric-val pink">CAMILA (PERÚ)</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">VELOCIDAD:</span>
-              <span class="metric-val green">+20%</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">LATENCIA BUFFER:</span>
-              <span class="metric-val cyan">&lt; 120 ms</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- RAG & Vector Memory Widget -->
-        <div class="hud-widget">
-          <div class="widget-header">
-            <span class="widget-icon">🔮</span>
-            <span class="widget-title">RAG // MEMORIA VECTORIAL</span>
-            <span class="widget-badge purple">PGVECTOR</span>
-          </div>
-          <div class="widget-body">
-            <div class="metric-row">
-              <span class="metric-label">MOTOR VECTOR:</span>
-              <span class="metric-val purple">POSTGRESQL 1024-D</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">EMBEDDINGS:</span>
-              <span class="metric-val cyan">bge-m3 CUDA</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">HISTORIAL SESIÓN:</span>
-              <span class="metric-val green">ACTIVO (12 TURNOS)</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Wake Word & Pipeline Widget -->
-        <div class="hud-widget">
-          <div class="widget-header">
-            <span class="widget-icon">⚡</span>
-            <span class="widget-title">WAKE WORD // ALEXA MODE</span>
-            <span class="widget-badge purple" id="telWakeWordStatus">ON ("EVI")</span>
-          </div>
-          <div class="widget-body">
-            <div class="metric-row">
-              <span class="metric-label">MOTOR ONNX:</span>
-              <span class="metric-val purple">OPENWAKEWORD</span>
-            </div>
-            <div class="metric-row">
-              <span class="metric-label">LATENCIA PIPELINE:</span>
-              <span class="metric-val green">&lt; 650 ms</span>
+              <span class="metric-label">VOZ ACTIVA:</span>
+              <span class="metric-val pink">CAMILA (PERÚ) +20%</span>
             </div>
           </div>
         </div>
@@ -412,97 +327,24 @@
     </main>
   </div>
 
-  <!-- Modal de Gestión de Memorias y RAG -->
-  <div class="hud-modal" id="memoryModal">
-    <div class="modal-overlay" id="modalOverlay"></div>
-    <div class="modal-card">
+  <!-- Modal de Memorias Persistentes -->
+  <div class="hud-modal-overlay" id="memoryModal">
+    <div class="hud-modal-card">
       <div class="modal-header">
-        <div class="modal-title">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 15h-2v-6h2zm0-8h-2V7h2z"/>
-          </svg>
-          <span>BASE DE CONOCIMIENTO & MEMORIAS PERSISTENTES</span>
-        </div>
-        <button class="modal-close-btn" id="closeModalBtn">&times;</button>
+        <span class="modal-title">🧠 MEMORIAS PERSISTENTES // PGVECTOR</span>
+        <button class="modal-close-btn" id="closeMemoryModalBtn">&times;</button>
       </div>
-
       <div class="modal-body">
-        <div class="memory-form">
-          <label class="form-label">AGREGAR NUEVO HECHO O PREFERENCIA:</label>
-          <div class="form-row">
-            <input type="text" id="newMemoryInput" placeholder="Ej: Mi framework favorito es NestJS con TypeScript..." />
-            <button class="hud-btn-cyber pink" id="saveMemoryBtn">GUARDAR</button>
-          </div>
+        <div class="memory-input-group">
+          <input type="text" id="newMemoryInput" placeholder="Añade un nuevo recuerdo o preferencia para Cristian..." />
+          <button class="hud-btn-cyber cyan" id="saveMemoryBtn">GUARDAR</button>
         </div>
-
-        <div class="memory-list-section">
-          <div class="list-header">
-            <span class="list-title">MEMORIAS ALMACENADAS EN POSTGRESQL (PGVECTOR)</span>
-            <button class="refresh-link" id="refreshMemoriesBtn">ACTUALIZAR</button>
-          </div>
-          <div class="memory-items-container" id="memoryItemsContainer">
-            <div class="loading-placeholder">Cargando memorias vectoriales...</div>
-          </div>
+        <div class="memory-list-header">
+          <span>RECUERDOS ACTIVOS EN POSTGRESQL</span>
+          <button class="refresh-link" id="refreshMemoriesBtn">ACTUALIZAR</button>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal de Ajustes de EVI Desktop -->
-  <div class="hud-modal" id="settingsModal">
-    <div class="modal-overlay" id="settingsModalOverlay"></div>
-    <div class="modal-card">
-      <div class="modal-header">
-        <div class="modal-title">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-          <span>CONFIGURACIÓN DE EVI DESKTOP</span>
-        </div>
-        <button class="modal-close-btn" id="closeSettingsModalBtn">&times;</button>
-      </div>
-
-      <div class="modal-body settings-body">
-        <div class="setting-item">
-          <div class="setting-info">
-            <span class="setting-title">Iniciar con Windows</span>
-            <span class="setting-desc">Arranca EVI silenciosamente en la bandeja del sistema al encender tu PC.</span>
-          </div>
-          <label class="cyber-switch">
-            <input type="checkbox" id="settingStartWithWindows">
-            <span class="cyber-slider"></span>
-          </label>
-        </div>
-
-        <div class="setting-item">
-          <div class="setting-info">
-            <span class="setting-title">Modo de Escucha Predeterminado</span>
-            <span class="setting-desc">Elige si EVI siempre escucha la palabra clave "EVI" o solo con pulsación.</span>
-          </div>
-          <select id="settingListeningMode" class="hud-select">
-            <option value="alexa">🎙️ Modo Alexa (Wake Word "EVI")</option>
-            <option value="push">🔘 Modo Push-to-Talk (Espacio / Clic)</option>
-          </select>
-        </div>
-
-        <div class="setting-item">
-          <div class="setting-info">
-            <span class="setting-title">Sensibilidad Wake Word</span>
-            <span class="setting-desc">Sensibilidad del reconocedor continuo de activación (0.3 = estricto, 0.7 = sensible).</span>
-          </div>
-          <div class="slider-val-box">
-            <input type="range" id="settingSensitivity" min="0.1" max="0.9" step="0.05" value="0.5" class="hud-slider">
-            <span id="sensitivityDisplay" style="color:var(--neon-pink);font-family:var(--font-mono);font-size:12px;">0.50</span>
-          </div>
-        </div>
-
-        <div class="setting-item">
-          <div class="setting-info">
-            <span class="setting-title">Servidor Backend Orquestador</span>
-            <span class="setting-desc">Dirección WebSocket local del orquestador NestJS.</span>
-          </div>
-          <input type="text" id="settingOrchestratorUrl" class="hud-input-text" value="http://localhost:3000" />
+        <div class="memory-items-container" id="memoryItemsContainer">
+          <div class="loading-placeholder">Cargando memorias de Cristian...</div>
         </div>
       </div>
     </div>
