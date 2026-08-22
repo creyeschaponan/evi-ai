@@ -72,11 +72,11 @@ function startVisualizerLoop() {
   function renderVisualizer() {
     requestAnimationFrame(renderVisualizer);
 
-    const width = visualizerCanvas.width;
-    const height = visualizerCanvas.height;
+    const width = visualizerCanvas.width = 400;
+    const height = visualizerCanvas.height = 400;
     const centerX = width / 2;
     const centerY = height / 2;
-    const baseRadius = 66;
+    const baseRadius = 86;
 
     canvasCtx.clearRect(0, 0, width, height);
     idleAngle += 0.02;
