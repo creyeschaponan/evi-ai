@@ -185,6 +185,9 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     if (abortController.signal.aborted) return;
 
+    let initialAckText = '';
+    let initialAckPromise: Promise<void> = Promise.resolve();
+
     // 3. Verificar si es una consulta a Google Workspace (Gmail / Calendar) mediante MCP
     if (!actionResultContext) {
       const lowerQuery = queryText.toLowerCase();
@@ -204,9 +207,35 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
         lowerQuery.includes('eventos de hoy');
 
       if (isGmailIntent) {
-        this.logger.log(`📬 [GMAIL INTENT DETECTED]: Consultando Groq MCP Gmail con: "${queryText}"...`);
+        const acks = [
+          'Revisando tu bandeja de entrada en este momento...',
+          'Dame un segundo, estoy escaneando tus correos...',
+          'Accediendo a tu Gmail para verificar tus mensajes...',
+          'Consultando tu bandeja de correo, un momento...',
+        ];
+        const ackPhrase = acks[Math.floor(Math.random() * acks.length)];
+        initialAckText = ackPhrase;
+
+        // Feedback visual inmediato en subtítulos
+        client.emit('text_token', ackPhrase + '\n\n');
+
+        // Síntesis y emisión inmediata de audio para percepción de 0ms latencia
+        initialAckPromise = this.ttsService
+          .synthesizeSentence(ackPhrase)
+          .then((buf) => {
+            if (buf && buf.length > 0 && !abortController.signal.aborted) {
+              this.logger.log(`🔊 [INSTANT ACK TTS] (${buf.length} bytes) -> "${ackPhrase}"`);
+              client.emit('audio_chunk', buf.toString('base64'));
+            }
+          })
+          .catch((err) => this.logger.warn(`Ack TTS error: ${err.message}`));
+
+        this.logger.log(`📬 [GMAIL INTENT DETECTED]: Conectando con Groq MCP Gmail en paralelo para: "${queryText}"...`);
         try {
-          const mcpResult = await this.googleMcpService.queryGmail(queryText);
+          const [mcpResult] = await Promise.all([
+            this.googleMcpService.queryGmail(queryText),
+            initialAckPromise,
+          ]);
           if (mcpResult && mcpResult.text) {
             actionResultContext = `[DATOS DE GMAIL EN VIVO]: ${mcpResult.text}`;
           }
@@ -214,9 +243,32 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
           this.logger.warn(`Error en Google MCP Gmail: ${mcpErr.message}`);
         }
       } else if (isCalendarIntent) {
-        this.logger.log(`📅 [CALENDAR INTENT DETECTED]: Consultando Groq MCP Calendar Connector...`);
+        const acks = [
+          'Revisando tu calendario de hoy, un momento...',
+          'Dame un segundo, verifico tu agenda y reuniones...',
+          'Accediendo a Google Calendar en este momento...',
+        ];
+        const ackPhrase = acks[Math.floor(Math.random() * acks.length)];
+        initialAckText = ackPhrase;
+
+        client.emit('text_token', ackPhrase + '\n\n');
+
+        initialAckPromise = this.ttsService
+          .synthesizeSentence(ackPhrase)
+          .then((buf) => {
+            if (buf && buf.length > 0 && !abortController.signal.aborted) {
+              this.logger.log(`🔊 [INSTANT ACK TTS] (${buf.length} bytes) -> "${ackPhrase}"`);
+              client.emit('audio_chunk', buf.toString('base64'));
+            }
+          })
+          .catch((err) => this.logger.warn(`Ack TTS error: ${err.message}`));
+
+        this.logger.log(`📅 [CALENDAR INTENT DETECTED]: Conectando con Groq MCP Calendar en paralelo...`);
         try {
-          const mcpResult = await this.googleMcpService.getTodayCalendarSummary();
+          const [mcpResult] = await Promise.all([
+            this.googleMcpService.getTodayCalendarSummary(),
+            initialAckPromise,
+          ]);
           if (mcpResult && mcpResult.text) {
             actionResultContext = `[RESULTADO DE TU GOOGLE CALENDAR VIA MCP]: ${mcpResult.text}`;
           }
@@ -243,12 +295,12 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // 4. Stream tokens con pipeline paralelo de TTS en tiempo real
     let sentenceBuffer = '';
-    let fullAssistantResponse = '';
+    let fullAssistantResponse = initialAckText ? initialAckText + '\n\n' : '';
     let chunkIndex = 0;
 
     // Pipeline de pre-fetch: sintetiza hasta 2 frases en paralelo manteniendo el orden FIFO
     const pendingAudioSlots: Promise<{ idx: number; audio: Buffer | null; text: string }>[] = [];
-    let emitQueue = Promise.resolve();
+    let emitQueue = initialAckPromise;
 
     const dispatchAudioChunk = (sentence: string) => {
       if (abortController.signal.aborted) return;
