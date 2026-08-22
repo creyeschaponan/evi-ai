@@ -18,7 +18,7 @@ export class GoogleMcpService {
   /**
    * Consulta Gmail de forma dinámica y exhaustiva según la petición del usuario
    */
-  async queryGmail(userQuery: string): Promise<McpToolResponse> {
+  async queryGmail(userQuery: string, isRetry = false): Promise<McpToolResponse> {
     const token = await this.googleAuth.getAccessToken();
 
     if (!token) {
@@ -92,6 +92,16 @@ export class GoogleMcpService {
       if (!response.ok) {
         const errBody = await response.text();
         this.logger.error(`Error en Groq MCP Responses API (${response.status}): ${errBody}`);
+
+        // Si el error es 424 (token expirado/error de conector) o 401, renovar token automáticamente y reintentar
+        if ((response.status === 424 || response.status === 401) && !isRetry) {
+          this.logger.warn('🔄 Detectado error en conector de Google. Forzando renovación de token con Google API y reintentando...');
+          const freshToken = await this.googleAuth.forceRefreshToken();
+          if (freshToken) {
+            return this.queryGmail(userQuery, true);
+          }
+        }
+
         return {
           success: false,
           text: `Hubo un inconveniente al consultar Gmail a través del conector MCP: ${response.statusText}.`,
@@ -148,7 +158,7 @@ export class GoogleMcpService {
   /**
    * Consulta la agenda de Google Calendar del día de hoy usando Groq MCP
    */
-  async getTodayCalendarSummary(): Promise<McpToolResponse> {
+  async getTodayCalendarSummary(isRetry = false): Promise<McpToolResponse> {
     const token = await this.googleAuth.getAccessToken();
 
     if (!token) {
@@ -188,6 +198,15 @@ export class GoogleMcpService {
       if (!response.ok) {
         const errBody = await response.text();
         this.logger.error(`Error en Groq MCP Calendar API: ${errBody}`);
+
+        if ((response.status === 424 || response.status === 401) && !isRetry) {
+          this.logger.warn('🔄 Error en conector Calendar. Renovando token automáticamente...');
+          const freshToken = await this.googleAuth.forceRefreshToken();
+          if (freshToken) {
+            return this.getTodayCalendarSummary(true);
+          }
+        }
+
         return {
           success: false,
           text: `No se pudo acceder a Google Calendar mediante MCP: ${response.statusText}`,
@@ -237,7 +256,8 @@ export class GoogleMcpService {
   async queryWorkspaceMcp(
     connectorId: 'connector_gmail' | 'connector_googlecalendar' | 'connector_googledrive',
     serverLabel: string,
-    userInput: string
+    userInput: string,
+    isRetry = false
   ): Promise<McpToolResponse> {
     const token = await this.googleAuth.getAccessToken();
     const groqKey = process.env.GROQ_API_KEY;
@@ -251,6 +271,7 @@ export class GoogleMcpService {
     }
 
     try {
+      this.logger.log(`Conectando con Groq MCP ${serverLabel} para consulta genérica...`);
       const response = await fetch(this.GROQ_RESPONSES_URL, {
         method: 'POST',
         headers: {
@@ -271,6 +292,25 @@ export class GoogleMcpService {
           input: userInput,
         }),
       });
+
+      if (!response.ok) {
+        const errBody = await response.text();
+        this.logger.error(`Error en Groq MCP Responses API (${response.status}): ${errBody}`);
+
+        if ((response.status === 424 || response.status === 401) && !isRetry) {
+          this.logger.warn('🔄 Renovando token automáticamente y reintentando...');
+          const freshToken = await this.googleAuth.forceRefreshToken();
+          if (freshToken) {
+            return this.queryWorkspaceMcp(connectorId, serverLabel, userInput, true);
+          }
+        }
+
+        return {
+          success: false,
+          text: `No se pudo completar la consulta en ${serverLabel}: ${response.statusText}`,
+          source: connectorId.includes('gmail') ? 'gmail' : connectorId.includes('calendar') ? 'calendar' : 'drive',
+        };
+      }
 
       const data = await response.json();
       let outputText = data.output_text;
@@ -294,16 +334,16 @@ export class GoogleMcpService {
       }
 
       return {
-        success: response.ok,
+        success: true,
         text: outputText,
         source: connectorId.includes('gmail') ? 'gmail' : connectorId.includes('calendar') ? 'calendar' : 'drive',
         raw: data,
       };
-    } catch (err: any) {
+    } catch (error: any) {
       return {
         success: false,
-        text: `Error ejecutando conector MCP: ${err.message}`,
-        source: 'none',
+        text: `Error al comunicar con conector ${serverLabel}: ${error.message}`,
+        source: connectorId.includes('gmail') ? 'gmail' : connectorId.includes('calendar') ? 'calendar' : 'drive',
       };
     }
   }
