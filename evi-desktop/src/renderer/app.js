@@ -339,6 +339,28 @@ function escapeHtml(str) {
 let isRecording = false;
 let webSpeechRecognition = null;
 
+function playActivationChime() {
+  try {
+    const ctx = getAudioContext();
+    if (ctx) {
+      if (ctx.state === 'suspended') ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(520, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.28);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.28);
+    }
+  } catch (e) {
+    console.warn('Chime audio error:', e);
+  }
+}
+
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SpeechRecognition) {
   webSpeechRecognition = new SpeechRecognition();
@@ -357,6 +379,7 @@ if (SpeechRecognition) {
       }
     }
     if (final) {
+      console.log('🎙️ [SPEECH RECOGNIZED]:', final);
       sendVoiceQuery(final);
     }
   };
@@ -376,13 +399,17 @@ if (SpeechRecognition) {
 function startVoiceCapture() {
   stopAndInterruptPlayback();
   initAudioContext();
+  playActivationChime();
   isRecording = true;
   setCoreState('LISTENING');
 
   if (webSpeechRecognition) {
     try {
       webSpeechRecognition.start();
-    } catch (e) {}
+      console.log('🎙️ [VOICE CAPTURE STARTED] Listening for command...');
+    } catch (e) {
+      console.warn('Speech recognition already active or error:', e);
+    }
   }
 }
 
