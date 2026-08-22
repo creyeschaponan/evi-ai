@@ -198,34 +198,37 @@ function startVisualizerLoop() {
     const height = visualizerCanvas.height;
     const centerX = width / 2;
     const centerY = height / 2;
-    const baseRadius = 60;
+    const baseRadius = 86;
 
     canvasCtx.clearRect(0, 0, width, height);
     idleAngle += 0.02;
 
     if (!analyser || (currentCoreState === 'STANDBY' && !isRecording && !isPlayingAudio)) {
       // Idle Holographic Radar Sweep & Particles
-      const pulse = Math.sin(idleAngle * 2) * 3;
+      const pulse = Math.sin(idleAngle * 2) * 4;
       
       // Halo Rosa Neón
       canvasCtx.beginPath();
       canvasCtx.arc(centerX, centerY, baseRadius + pulse, 0, 2 * Math.PI);
-      canvasCtx.strokeStyle = 'rgba(255, 0, 127, 0.35)';
-      canvasCtx.lineWidth = 2;
-      canvasCtx.shadowBlur = 12;
+      canvasCtx.strokeStyle = 'rgba(255, 0, 127, 0.4)';
+      canvasCtx.lineWidth = 2.5;
+      canvasCtx.shadowBlur = 14;
       canvasCtx.shadowColor = '#ff007f';
       canvasCtx.stroke();
       canvasCtx.shadowBlur = 0;
 
       // Nodos giratorios cian
-      for (let i = 0; i < 6; i++) {
-        const a = idleAngle + (i * Math.PI) / 3;
-        const x = centerX + Math.cos(a) * (baseRadius + 14);
-        const y = centerY + Math.sin(a) * (baseRadius + 14);
+      for (let i = 0; i < 8; i++) {
+        const a = idleAngle + (i * Math.PI) / 4;
+        const x = centerX + Math.cos(a) * (baseRadius + 18);
+        const y = centerY + Math.sin(a) * (baseRadius + 18);
         canvasCtx.beginPath();
-        canvasCtx.arc(x, y, 2.5, 0, 2 * Math.PI);
+        canvasCtx.arc(x, y, 3, 0, 2 * Math.PI);
         canvasCtx.fillStyle = '#00f0ff';
+        canvasCtx.shadowBlur = 8;
+        canvasCtx.shadowColor = '#00f0ff';
         canvasCtx.fill();
+        canvasCtx.shadowBlur = 0;
       }
       return;
     }
@@ -238,7 +241,7 @@ function startVisualizerLoop() {
 
     for (let i = 0; i < bars; i++) {
       const val = visualizerDataArray[i] / 255.0;
-      const barLength = Math.max(3, val * 42);
+      const barLength = Math.max(4, val * 52);
       const angle = i * step + idleAngle * 0.5;
 
       const x1 = centerX + Math.cos(angle) * baseRadius;
@@ -253,18 +256,18 @@ function startVisualizerLoop() {
       if (isRecording) {
         // Modo Grabación: Resplandor Rosa Intenso
         canvasCtx.strokeStyle = `rgba(255, 0, 127, ${0.4 + val * 0.6})`;
-        canvasCtx.shadowBlur = 10;
+        canvasCtx.shadowBlur = 12;
         canvasCtx.shadowColor = '#ff007f';
       } else {
         // Modo Habla: Gradiente Neón Rosa/Cian
         canvasCtx.strokeStyle = i % 2 === 0 
           ? `rgba(255, 0, 127, ${0.5 + val * 0.5})` 
           : `rgba(0, 240, 255, ${0.5 + val * 0.5})`;
-        canvasCtx.shadowBlur = 12;
+        canvasCtx.shadowBlur = 14;
         canvasCtx.shadowColor = i % 2 === 0 ? '#ff007f' : '#00f0ff';
       }
 
-      canvasCtx.lineWidth = 3;
+      canvasCtx.lineWidth = 3.5;
       canvasCtx.lineCap = 'round';
       canvasCtx.stroke();
       canvasCtx.shadowBlur = 0;
@@ -328,10 +331,6 @@ function playNextAudioChunk() {
     isPlayingAudio = false;
     if (currentCoreState === 'SPEAKING') {
       setCoreState('STANDBY');
-      // Resume continuous listener if in Alexa mode
-      if (currentSettings.listeningMode === 'alexa') {
-        startContinuousWakeListener();
-      }
     }
     return;
   }
@@ -383,325 +382,46 @@ function playNextAudioChunk() {
 }
 
 // =====================================================================
-// WebSocket Events
-// =====================================================================
-socket.on('connect', () => {
-  statusPulseDot.style.background = 'var(--accent-green)';
-  statusLabel.textContent = 'SISTEMA EN LÍNEA // GPU CUDA ACTIVA';
-});
-
-socket.on('disconnect', () => {
-  statusPulseDot.style.background = 'var(--neon-pink)';
-  statusLabel.textContent = 'DESCONECTADO DEL ORQUESTADOR';
-});
-
-let currentActiveMessageCard = null;
-
-socket.on('stt_transcription', (transcript) => {
-  if (transcript && transcript.trim()) {
-    appendUserMessage(transcript.trim());
-    setCoreState('THINKING');
-  }
-});
-
-socket.on('text_token', (token) => {
-  if (!currentActiveMessageCard) {
-    currentActiveMessageCard = createEviMessageCard();
-  }
-  const textContainer = currentActiveMessageCard.querySelector('.msg-text');
-  textContainer.textContent += token;
-  dialogueFeed.scrollTop = dialogueFeed.scrollHeight;
-});
-
-socket.on('audio_chunk', (base64Audio) => {
-  audioPlaybackQueue.push(base64Audio);
-  if (!isPlayingAudio) {
-    playNextAudioChunk();
-  }
-});
-
-socket.on('response_finished', () => {
-  currentActiveMessageCard = null;
-  if (!isPlayingAudio && audioPlaybackQueue.length === 0) {
-    setCoreState('STANDBY');
-    if (currentSettings.listeningMode === 'alexa') {
-      startContinuousWakeListener();
-    }
-  }
-});
-
-// =====================================================================
-// TTS Catalog & Real-time Voice Switcher
-// =====================================================================
-let ttsCatalogData = null;
-
-function renderTtsCatalog(catalog) {
-  ttsCatalogData = catalog;
-  if (!catalog || !catalog.engines) return;
-
-  const active = catalog.active || { engine: 'cosyvoice', voice: 'cosy-es-expressive', rate: '+30%' };
-
-  ttsEngineSelect.innerHTML = '';
-  catalog.engines.forEach((eng) => {
-    const opt = document.createElement('option');
-    opt.value = eng.id;
-    opt.textContent = eng.displayName;
-    if (eng.id === active.engine) {
-      opt.selected = true;
-    }
-    ttsEngineSelect.appendChild(opt);
-  });
-
-  updateVoiceDropdownForEngine(active.engine, active.voice);
-  updateRateSliderFromRateString(active.rate);
-  updateEngineBadge(active.engine, active.voice);
-}
-
-function updateVoiceDropdownForEngine(engineId, selectedVoiceId) {
-  if (!ttsCatalogData) return;
-  const engine = ttsCatalogData.engines.find((e) => e.id === engineId);
-  if (!engine) return;
-
-  ttsVoiceSelect.innerHTML = '';
-  engine.voices.forEach((v) => {
-    const opt = document.createElement('option');
-    opt.value = v.id;
-    opt.textContent = `${v.name} (${v.gender === 'female' ? 'F' : 'M'})`;
-    if (v.id === selectedVoiceId) {
-      opt.selected = true;
-    }
-    ttsVoiceSelect.appendChild(opt);
-  });
-
-  if (!selectedVoiceId && engine.voices.length > 0) {
-    ttsVoiceSelect.value = engine.voices[0].id;
-  }
-}
-
-function updateRateSliderFromRateString(rateStr) {
-  if (!rateStr) return;
-  const num = parseInt(rateStr.replace('%', '').replace('+', ''));
-  if (!isNaN(num)) {
-    ttsRateSlider.value = num;
-    ttsRateDisplay.textContent = num >= 0 ? `+${num}%` : `${num}%`;
-  }
-}
-
-function updateEngineBadge(engineId, voiceId) {
-  const engineName =
-    engineId === 'cosyvoice'
-      ? 'COSYVOICE 3'
-      : engineId === 'edge'
-      ? 'EDGE NEURAL'
-      : engineId === 'piper'
-      ? 'PIPER LOCAL'
-      : 'CHATTERBOX';
-  const cleanVoice = voiceId ? voiceId.replace('es-MX-', '').replace('es-US-', '').replace('es_MX-', '').replace('Neural', '').replace('cosy-es-', '') : '';
-  ttsEngineBadgeText.textContent = `${engineName} // ${cleanVoice.toUpperCase()}`;
-}
-
-// Event Listeners for Voice Toolbar
-ttsEngineSelect.addEventListener('change', () => {
-  const selectedEngine = ttsEngineSelect.value;
-  updateVoiceDropdownForEngine(selectedEngine);
-  const selectedVoice = ttsVoiceSelect.value;
-  const rateVal = parseInt(ttsRateSlider.value);
-  const rateStr = rateVal >= 0 ? `+${rateVal}%` : `${rateVal}%`;
-
-  socket.emit('update_tts_settings', {
-    engine: selectedEngine,
-    voice: selectedVoice,
-    rate: rateStr,
-  });
-  updateEngineBadge(selectedEngine, selectedVoice);
-});
-
-ttsVoiceSelect.addEventListener('change', () => {
-  const selectedVoice = ttsVoiceSelect.value;
-  socket.emit('update_tts_settings', { voice: selectedVoice });
-  updateEngineBadge(ttsEngineSelect.value, selectedVoice);
-});
-
-ttsRateSlider.addEventListener('input', () => {
-  const rateVal = parseInt(ttsRateSlider.value);
-  const rateStr = rateVal >= 0 ? `+${rateVal}%` : `${rateVal}%`;
-  ttsRateDisplay.textContent = rateStr;
-});
-
-ttsRateSlider.addEventListener('change', () => {
-  const rateVal = parseInt(ttsRateSlider.value);
-  const rateStr = rateVal >= 0 ? `+${rateVal}%` : `${rateVal}%`;
-  socket.emit('update_tts_settings', { rate: rateStr });
-});
-
-socket.on('tts_catalog', (catalog) => {
-  renderTtsCatalog(catalog);
-});
-
-socket.on('tts_config_updated', (cfg) => {
-  updateEngineBadge(cfg.engine, cfg.voice);
-});
-
-// =====================================================================
-// Dialogue UI Helpers
-// =====================================================================
-function appendUserMessage(text) {
-  const card = document.createElement('div');
-  card.className = 'message-card user-message';
-  card.innerHTML = `
-    <div class="msg-avatar">CR</div>
-    <div class="msg-content">
-      <div class="msg-sender">CRISTIAN <span class="msg-time">${new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</span></div>
-      <div class="msg-text">${escapeHtml(text)}</div>
-    </div>
-  `;
-  dialogueFeed.appendChild(card);
-  dialogueFeed.scrollTop = dialogueFeed.scrollHeight;
-}
-
-function createEviMessageCard() {
-  const card = document.createElement('div');
-  card.className = 'message-card evi-message';
-  card.innerHTML = `
-    <div class="msg-avatar">EVI</div>
-    <div class="msg-content">
-      <div class="msg-sender">E.V.I. <span class="msg-time">${new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</span></div>
-      <div class="msg-text"></div>
-    </div>
-  `;
-  dialogueFeed.appendChild(card);
-  dialogueFeed.scrollTop = dialogueFeed.scrollHeight;
-  return card;
-}
-
-function escapeHtml(str) {
-  return str.replace(/[&<>'"]/g, 
-    tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
-  );
-}
-
-// =====================================================================
-// Speech Recognition & Continuous Wake Word ("EVI" Alexa Mode)
+// Native Microphone Capture & Speech Handling (Local CUDA Faster-Whisper)
 // =====================================================================
 let isRecording = false;
-let webSpeechRecognition = null;
-let continuousRecognizer = null;
-let isContinuousListening = false;
+let micStream = null;
+let pcmProcessor = null;
+let recordedPcmChunks = [];
 
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-// Single-turn voice capture (after wake word or push-to-talk)
-if (SpeechRecognition) {
-  webSpeechRecognition = new SpeechRecognition();
-  webSpeechRecognition.lang = 'es-PE';
-  webSpeechRecognition.continuous = false;
-  webSpeechRecognition.interimResults = true;
-
-  webSpeechRecognition.onresult = (event) => {
-    const transcript = Array.from(event.results).map(r => r[0].transcript).join('');
-    voicePromptText.textContent = `ESCUCHANDO: "${transcript}"`;
-    if (event.results[0].isFinal) {
-      stopVoiceCapture();
-      sendTextMessage(transcript);
-    }
-  };
-
-  webSpeechRecognition.onerror = (e) => {
-    console.warn('Web Speech Error:', e);
-    stopVoiceCapture();
-  };
-
-  webSpeechRecognition.onend = () => {
-    if (isRecording) {
-      stopVoiceCapture();
-    }
-  };
-}
-
-// Continuous background recognizer for "EVI" detection in Alexa mode
-function initContinuousWakeRecognizer() {
-  if (!SpeechRecognition) return;
-  continuousRecognizer = new SpeechRecognition();
-  continuousRecognizer.lang = 'es-PE';
-  continuousRecognizer.continuous = true;
-  continuousRecognizer.interimResults = true;
-
-  continuousRecognizer.onresult = (event) => {
-    if (isRecording || isPlayingAudio) return;
-
-    for (let i = event.resultIndex; i < event.results.length; ++i) {
-      const text = event.results[i][0].transcript.toLowerCase();
-      
-      // Check for wake word "evi", "évi", "hevi", "oye evi", "hey evi"
-      if (text.includes('evi') || text.includes('évi') || text.includes('hevi') || text.includes('ibie') || text.includes('edie')) {
-        console.log('[Wake Word Triggered]:', text);
-        continuousRecognizer.stop();
-        triggerWakeWordActivation();
-        break;
-      }
-    }
-  };
-
-  continuousRecognizer.onend = () => {
-    if (isContinuousListening && !isRecording && !isPlayingAudio) {
-      try {
-        continuousRecognizer.start();
-      } catch (e) {}
-    }
-  };
-
-  continuousRecognizer.onerror = (e) => {
-    if (e.error !== 'no-speech') {
-      console.warn('Continuous recognizer notice:', e.error);
-    }
-  };
-}
-
-function startContinuousWakeListener() {
-  if (!continuousRecognizer) initContinuousWakeRecognizer();
-  if (!continuousRecognizer) return;
-
-  isContinuousListening = true;
-  try {
-    continuousRecognizer.start();
-    console.log('[EVI] Continuous Alexa wake-word listener started.');
-  } catch (e) {}
-}
-
-function stopContinuousWakeListener() {
-  isContinuousListening = false;
-  if (continuousRecognizer) {
-    try {
-      continuousRecognizer.stop();
-    } catch (e) {}
-  }
-}
-
-function triggerWakeWordActivation() {
-  // Play chime
-  wakeChime.currentTime = 0;
-  wakeChime.play().catch(() => {});
-
-  // Visual Arc Reactor flash
-  voiceCoreBtn.classList.add('wake-flash');
-  setTimeout(() => voiceCoreBtn.classList.remove('wake-flash'), 600);
-
-  // Stop background listener temporarily and start command capture
-  stopContinuousWakeListener();
-  startVoiceCapture();
-}
-
-function startVoiceCapture() {
+async function startVoiceCapture() {
+  if (isRecording) return;
   initAudioContext();
-  isRecording = true;
-  setCoreState('LISTENING');
 
-  if (webSpeechRecognition) {
-    try {
-      webSpeechRecognition.start();
-    } catch (e) {
-      console.warn('Recognition already started:', e);
-    }
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        sampleRate: 16000,
+        echoCancellation: true,
+        noiseSuppression: true,
+      },
+    });
+
+    const source = audioCtx.createMediaStreamSource(micStream);
+    pcmProcessor = audioCtx.createScriptProcessor(4096, 1, 1);
+    recordedPcmChunks = [];
+
+    source.connect(analyser);
+    source.connect(pcmProcessor);
+    pcmProcessor.connect(audioCtx.destination);
+
+    pcmProcessor.onaudioprocess = (e) => {
+      if (!isRecording) return;
+      const input = e.inputBuffer.getChannelData(0);
+      recordedPcmChunks.push(new Float32Array(input));
+    };
+
+    isRecording = true;
+    setCoreState('LISTENING');
+  } catch (err) {
+    console.error('Error accessing microphone:', err);
+    setCoreState('STANDBY');
   }
 }
 
@@ -709,15 +429,72 @@ function stopVoiceCapture() {
   if (!isRecording) return;
   isRecording = false;
 
-  if (webSpeechRecognition) {
-    try {
-      webSpeechRecognition.stop();
-    } catch (e) {}
+  if (pcmProcessor) {
+    pcmProcessor.disconnect();
+    pcmProcessor = null;
   }
 
-  if (currentCoreState === 'LISTENING') {
-    setCoreState('STANDBY');
+  if (micStream) {
+    micStream.getTracks().forEach((track) => track.stop());
+    micStream = null;
   }
+
+  if (recordedPcmChunks.length === 0) {
+    setCoreState('STANDBY');
+    return;
+  }
+
+  setCoreState('THINKING');
+
+  // Convert collected float chunks to 16-bit 16kHz PCM
+  const totalLength = recordedPcmChunks.reduce((acc, c) => acc + c.length, 0);
+  const merged = new Float32Array(totalLength);
+  let offset = 0;
+  for (const chunk of recordedPcmChunks) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  const pcm16Buffer = export16BitPCM(merged, audioCtx.sampleRate, 16000);
+  const base64Audio = btoa(
+    new Uint8Array(pcm16Buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+  );
+
+  socket.emit('voice_command_audio', { buffer: base64Audio, rate: 16000 });
+}
+
+function export16BitPCM(samples, sampleRate, targetRate = 16000) {
+  const ratio = sampleRate / targetRate;
+  const targetLength = Math.round(samples.length / ratio);
+  const buffer = new ArrayBuffer(targetLength * 2);
+  const view = new DataView(buffer);
+
+  for (let i = 0; i < targetLength; i++) {
+    const srcIdx = Math.floor(i * ratio);
+    let s = Math.max(-1, Math.min(1, samples[srcIdx]));
+    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return buffer;
+}
+
+function startContinuousWakeListener() {
+  console.log('[EVI Desktop] Alexa mode active (Waiting for wake trigger or spacebar)...');
+}
+
+function stopContinuousWakeListener() {
+  // Idle
+}
+
+function triggerWakeWordActivation() {
+  // Play futuristic chime
+  wakeChime.currentTime = 0;
+  wakeChime.play().catch(() => {});
+
+  // Visual Arc Reactor flash
+  voiceCoreBtn.classList.add('wake-flash');
+  setTimeout(() => voiceCoreBtn.classList.remove('wake-flash'), 600);
+
+  startVoiceCapture();
 }
 
 voiceCoreBtn.addEventListener('click', () => {
