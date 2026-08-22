@@ -11,6 +11,7 @@ import time
 import json
 import urllib.request
 import urllib.error
+from collections import deque
 
 # Forzar UTF-8 seguro en Windows Console
 if sys.platform == "win32":
@@ -31,11 +32,12 @@ MODEL_PATH = os.path.join(PROJECT_ROOT, "models", "hey_evi.onnx")
 ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "http://localhost:3000")
 TRIGGER_ENDPOINT = f"{ORCHESTRATOR_URL}/api/wakeword/trigger"
 
-# Parametros de Audio para openWakeWord
+# Parametros de Audio y Deteccion Optimizados
 SAMPLE_RATE = 16000
-CHUNK_SAMPLES = 1280  # 80 ms a 16kHz (1280 muestras por frame)
-DETECTION_THRESHOLD = 0.35  # Umbral optimizado para capturar voz natural
-COOLDOWN_SECONDS = 1.6
+CHUNK_SAMPLES = 1280       # 80 ms por frame
+AUDIO_GAIN = 1.8           # Ganancia de microfono para igualar niveles de entrenamiento
+DETECTION_THRESHOLD = 0.25 # Umbral calibrado para maxima sensibilidad y confort
+COOLDOWN_SECONDS = 1.4     # Tiempo entre disparos
 
 def trigger_orchestrator(score: float, model_name: str = "hey_evi"):
     """Envia notificacion HTTP al orquestador NestJS cuando se detecta el Wake Word."""
@@ -52,18 +54,18 @@ def trigger_orchestrator(score: float, model_name: str = "hey_evi"):
         headers={"Content-Type": "application/json"}
     )
     try:
-        with urllib.request.urlopen(req, timeout=1.5) as resp:
+        with urllib.request.urlopen(req, timeout=1.2) as resp:
             if resp.status == 200:
-                print(f"\n📡 [TRIGGER ENVIADO] Orquestador NestJS activado! (Status 200)")
+                print(f"📡 [TRIGGER HTTP 200] -> Orquestador y Navegador Activados!")
     except urllib.error.URLError as err:
-        print(f"\n⚠️ [ORQUESTADOR OFFLINE] No se pudo conectar a {TRIGGER_ENDPOINT}: {err.reason}")
+        print(f"⚠️ [ORQUESTADOR OFFLINE] No se pudo contactar a {TRIGGER_ENDPOINT}: {err.reason}")
     except Exception as ex:
-        print(f"\n⚠️ [TRIGGER ERROR]: {ex}")
+        print(f"⚠️ [TRIGGER ERROR]: {ex}")
 
 def main():
-    print("=" * 68)
+    print("=" * 70)
     print("  🚀 [E.V.I.] WAKE WORD LISTENER DAEMON ('Hey EVI' / 'Hola EVI')")
-    print("=" * 68)
+    print("=" * 70)
 
     if not os.path.exists(MODEL_PATH):
         print(f"❌ [ERROR] Modelo no encontrado en: {MODEL_PATH}")
@@ -86,47 +88,55 @@ def main():
     except Exception as d_err:
         print(f"🎙️ [AUDIO] Dispositivo por defecto: {d_err}")
 
-    print(f"🎯 [CONFIG] Umbral: {DETECTION_THRESHOLD} | Cooldown: {COOLDOWN_SECONDS}s")
-    print("👂 Escuchando en vivo... Di 'Hey EVI', 'Hola EVI' o 'Okay EVI'...")
-    print("=" * 68)
+    print(f"🎯 [CONFIG] Umbral: {DETECTION_THRESHOLD} | Ganancia: {AUDIO_GAIN}x | Cooldown: {COOLDOWN_SECONDS}s")
+    print("👂 Rastreando en vivo con medidor de picos... Di 'Hey EVI', 'Hola EVI' o 'Okay EVI'...")
+    print("=" * 70)
 
     last_trigger_time = 0
     frame_counter = 0
+    recent_scores = deque(maxlen=20)  # Historial de los ultimos ~1.6 segundos
+    recent_volumes = deque(maxlen=20)
 
     def audio_callback(indata, frames, time_info, status):
         nonlocal last_trigger_time, frame_counter
         if status:
             pass
 
-        # 1. Asegurar arreglo 1D plano de tipo int16 exacto
-        audio_1d = indata.flatten()
+        # 1. Aplicar ganancia de software y asegurar int16 1D
+        audio_raw = indata.flatten().astype(np.float32)
+        audio_boosted = np.clip(audio_raw * AUDIO_GAIN, -32768, 32767).astype(np.int16)
 
-        # 2. Calcular nivel RMS de volumen del microfono para feedback visual
-        rms = np.sqrt(np.mean(audio_1d.astype(np.float32) ** 2))
-        vol_pct = min(100, int((rms / 32768.0) * 800))
+        # 2. Medir volumen RMS del microfono
+        rms = np.sqrt(np.mean(audio_boosted.astype(np.float32) ** 2))
+        vol_pct = min(100, int((rms / 32768.0) * 600))
+        recent_volumes.append(vol_pct)
 
-        # 3. Prediccion openWakeWord en 1D
-        prediction = oww_model.predict(audio_1d)
+        # 3. Prediccion openWakeWord
+        prediction = oww_model.predict(audio_boosted)
+        score = float(prediction.get("hey_evi", 0.0))
+        recent_scores.append(score)
 
-        # 4. Obtener score del modelo hey_evi
-        score = prediction.get("hey_evi", 0.0)
+        peak_score = max(recent_scores) if len(recent_scores) > 0 else score
+        max_vol = max(recent_volumes) if len(recent_volumes) > 0 else vol_pct
 
-        # Feedback en consola cada ~4 frames (320ms)
+        # 4. Telemetria visual continua en la misma linea de la consola
         frame_counter += 1
-        if frame_counter % 4 == 0:
-            bars = "█" * (vol_pct // 10) + "░" * (10 - (vol_pct // 10))
-            score_bar = "🔥" if score >= DETECTION_THRESHOLD else ("⚡" if score > 0.15 else " ")
-            sys.stdout.write(f"\r[MIC: {bars} {vol_pct:2d}%] [Score Hey EVI: {score:0.3f}] {score_bar}   ")
+        if frame_counter % 3 == 0:
+            vol_bars = "█" * (max_vol // 10) + "░" * (10 - (max_vol // 10))
+            status_symbol = "🔥 ACTIVADO!" if score >= DETECTION_THRESHOLD else ("⚡ Reconociendo..." if peak_score > 0.12 else "             ")
+            sys.stdout.write(
+                f"\r[MIC: {vol_bars} {max_vol:2d}%] [Actual: {score:.3f}] [Pico reciente: {peak_score:.3f}] {status_symbol}"
+            )
             sys.stdout.flush()
 
-        # 5. Evaluar deteccion
+        # 5. Disparo cuando el score supera el umbral
         if score >= DETECTION_THRESHOLD:
             current_time = time.time()
             if (current_time - last_trigger_time) > COOLDOWN_SECONDS:
                 last_trigger_time = current_time
                 print(f"\n\n🔥 ========================================================")
-                print(f"⚡ [WAKE WORD DETECTADO] Score: {score:.4f} -> 'Hey EVI'!")
-                print(f"🔥 ========================================================\n")
+                print(f"⚡ [WAKE WORD DETECTADO] Score: {score:.4f} (Pico: {peak_score:.4f}) -> 'Hey EVI'!")
+                print(f"🔥 ========================================================")
                 trigger_orchestrator(score, "hey_evi")
 
     try:
@@ -138,9 +148,9 @@ def main():
             callback=audio_callback
         ):
             while True:
-                time.sleep(0.5)
+                time.sleep(0.4)
     except KeyboardInterrupt:
-        print("\n🛑 Deteniendo Wake Word Listener...")
+        print("\n\n🛑 Deteniendo Wake Word Listener...")
     except Exception as err:
         print(f"\n❌ [ERROR en stream de audio]: {err}")
 
