@@ -35,9 +35,28 @@ TRIGGER_ENDPOINT = f"{ORCHESTRATOR_URL}/api/wakeword/trigger"
 # Parametros de Audio y Deteccion Optimizados
 SAMPLE_RATE = 16000
 CHUNK_SAMPLES = 1280       # 80 ms por frame
-AUDIO_GAIN = 2.2           # Ganancia de microfono para capturar voz con volumen suave
-DETECTION_THRESHOLD = 0.12 # Umbral calibrado (silencio ambiente es 0.00, voz supera 0.20)
+AUDIO_GAIN = 1.8           # Ganancia normalizada para Realtek
+DETECTION_THRESHOLD = 0.15 # Umbral optimizado para activacion fluida
 COOLDOWN_SECONDS = 1.4     # Tiempo entre disparos
+
+def get_best_input_device():
+    """Selecciona automaticamente el microfono Realtek del usuario o el preferido."""
+    preferred = os.environ.get("WAKEWORD_INPUT_DEVICE", "realtek").lower()
+    devices = sd.query_devices()
+    
+    # 1. Buscar coincidencia con Realtek
+    for i, dev in enumerate(devices):
+        if dev['max_input_channels'] > 0:
+            name_lower = dev['name'].lower()
+            if preferred in name_lower and ("mic" in name_lower or "audio" in name_lower):
+                return i, dev['name']
+
+    # 2. Fallback al microfono por defecto
+    try:
+        def_dev = sd.query_devices(kind='input')
+        return def_dev['index'], def_dev['name']
+    except:
+        return None, "Default Input Device"
 
 def trigger_orchestrator(score: float, model_name: str = "hey_evi"):
     """Envia notificacion HTTP al orquestador NestJS cuando se detecta el Wake Word."""
@@ -56,11 +75,11 @@ def trigger_orchestrator(score: float, model_name: str = "hey_evi"):
     try:
         with urllib.request.urlopen(req, timeout=1.2) as resp:
             if resp.status == 200:
-                print(f"📡 [TRIGGER HTTP 200] -> Orquestador y Navegador Activados!")
+                print(f"\n📡 [TRIGGER HTTP 200] -> Orquestador y Navegador Activados!")
     except urllib.error.URLError as err:
-        print(f"⚠️ [ORQUESTADOR OFFLINE] No se pudo contactar a {TRIGGER_ENDPOINT}: {err.reason}")
+        print(f"\n⚠️ [ORQUESTADOR OFFLINE] No se pudo contactar a {TRIGGER_ENDPOINT}: {err.reason}")
     except Exception as ex:
-        print(f"⚠️ [TRIGGER ERROR]: {ex}")
+        print(f"\n⚠️ [TRIGGER ERROR]: {ex}")
 
 def main():
     print("=" * 70)
@@ -82,19 +101,15 @@ def main():
         print(f"❌ [ERROR al cargar modelo]: {e}")
         sys.exit(1)
 
-    try:
-        default_device = sd.query_devices(kind='input')
-        print(f"🎙️ [AUDIO] Microfono activo: {default_device['name']}")
-    except Exception as d_err:
-        print(f"🎙️ [AUDIO] Dispositivo por defecto: {d_err}")
-
+    device_idx, device_name = get_best_input_device()
+    print(f"🎙️ [AUDIO] Dispositivo seleccionado: [{device_idx}] {device_name}")
     print(f"🎯 [CONFIG] Umbral: {DETECTION_THRESHOLD} | Ganancia: {AUDIO_GAIN}x | Cooldown: {COOLDOWN_SECONDS}s")
-    print("👂 Rastreando en vivo con medidor de picos... Di 'Hey EVI', 'Hola EVI' o 'Okay EVI'...")
+    print("👂 Escuchando en vivo... Di 'Hey EVI', 'Hola EVI' o 'Okay EVI'...")
     print("=" * 70)
 
     last_trigger_time = 0
     frame_counter = 0
-    recent_scores = deque(maxlen=20)  # Historial de los ultimos ~1.6 segundos
+    recent_scores = deque(maxlen=20)
     recent_volumes = deque(maxlen=20)
 
     def audio_callback(indata, frames, time_info, status):
@@ -102,16 +117,21 @@ def main():
         if status:
             pass
 
-        # 1. Aplicar ganancia de software y asegurar int16 1D
-        audio_raw = indata.flatten().astype(np.float32)
-        audio_boosted = np.clip(audio_raw * AUDIO_GAIN, -32768, 32767).astype(np.int16)
+        # 1. Si el dispositivo tiene multiples canales, tomar el primer canal mono
+        if indata.ndim > 1:
+            raw_channel = indata[:, 0]
+        else:
+            raw_channel = indata
 
-        # 2. Medir volumen RMS del microfono
+        # 2. Aplicar ganancia y convertir a int16 plano 1D
+        audio_boosted = np.clip(raw_channel.astype(np.float32) * AUDIO_GAIN, -32768, 32767).astype(np.int16)
+
+        # 3. Medir nivel RMS de volumen
         rms = np.sqrt(np.mean(audio_boosted.astype(np.float32) ** 2))
-        vol_pct = min(100, int((rms / 32768.0) * 600))
+        vol_pct = min(100, int((rms / 32768.0) * 400))
         recent_volumes.append(vol_pct)
 
-        # 3. Prediccion openWakeWord
+        # 4. Prediccion openWakeWord
         prediction = oww_model.predict(audio_boosted)
         score = float(prediction.get("hey_evi", 0.0))
         recent_scores.append(score)
@@ -119,28 +139,29 @@ def main():
         peak_score = max(recent_scores) if len(recent_scores) > 0 else score
         max_vol = max(recent_volumes) if len(recent_volumes) > 0 else vol_pct
 
-        # 4. Telemetria visual continua en la misma linea de la consola
+        # 5. Telemetria visual continua
         frame_counter += 1
         if frame_counter % 3 == 0:
             vol_bars = "█" * (max_vol // 10) + "░" * (10 - (max_vol // 10))
-            status_symbol = "🔥 ACTIVADO!" if score >= DETECTION_THRESHOLD else ("⚡ Reconociendo..." if peak_score > 0.12 else "             ")
+            status_symbol = "🔥 ACTIVADO!" if score >= DETECTION_THRESHOLD else ("⚡ Reconociendo..." if peak_score > 0.10 else "             ")
             sys.stdout.write(
                 f"\r[MIC: {vol_bars} {max_vol:2d}%] [Actual: {score:.3f}] [Pico reciente: {peak_score:.3f}] {status_symbol}"
             )
             sys.stdout.flush()
 
-        # 5. Disparo cuando el score supera el umbral
+        # 6. Disparo al superar el umbral
         if score >= DETECTION_THRESHOLD:
             current_time = time.time()
             if (current_time - last_trigger_time) > COOLDOWN_SECONDS:
                 last_trigger_time = current_time
                 print(f"\n\n🔥 ========================================================")
                 print(f"⚡ [WAKE WORD DETECTADO] Score: {score:.4f} (Pico: {peak_score:.4f}) -> 'Hey EVI'!")
-                print(f"🔥 ========================================================")
+                print(f"🔥 ========================================================\n")
                 trigger_orchestrator(score, "hey_evi")
 
     try:
         with sd.InputStream(
+            device=device_idx,
             samplerate=SAMPLE_RATE,
             channels=1,
             dtype='int16',
