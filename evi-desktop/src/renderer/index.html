@@ -283,16 +283,21 @@
           </div>
           <div class="widget-body">
             <div class="metric-row">
-              <span class="metric-label">GMAIL MCP:</span>
-              <span class="metric-val cyan">connector_gmail</span>
+              <span class="metric-label">GMAIL API:</span>
+              <span class="metric-val cyan">REST v1 Nativo</span>
             </div>
             <div class="metric-row">
-              <span class="metric-label">CALENDAR MCP:</span>
-              <span class="metric-val pink">connector_googlecalendar</span>
+              <span class="metric-label">CALENDAR API:</span>
+              <span class="metric-val pink">REST v3 Nativo</span>
             </div>
             <div class="metric-row">
-              <span class="metric-label">GROQ RESPONSES:</span>
-              <span class="metric-val green">gpt-oss-120b</span>
+              <span class="metric-label">TOKEN STATUS:</span>
+              <span class="metric-val green" id="googleTokenStatus">AUTO-RENOVABLE</span>
+            </div>
+            <div style="margin-top: 8px;">
+              <a href="http://localhost:3000/api/auth/google/login" target="_blank" class="action-btn-neon cyan" id="googleAuthBtn" style="width: 100%; justify-content: center; font-size: 11px; padding: 6px 8px; text-decoration: none; display: flex; align-items: center; box-sizing: border-box;">
+                🔑 VINCULAR GOOGLE (1-CLICK)
+              </a>
             </div>
           </div>
         </div>

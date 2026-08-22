@@ -1,4 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class GoogleAuthService implements OnModuleInit {
@@ -7,7 +9,6 @@ export class GoogleAuthService implements OnModuleInit {
   private tokenExpiresAt: number = 0;
 
   async onModuleInit() {
-    // Intentar obtener/renovar el token al iniciar el servidor
     if (this.hasRefreshTokenConfig()) {
       this.logger.log('🔑 Obteniendo Google OAuth2 Access Token inicial via API...');
       await this.forceRefreshToken();
@@ -27,7 +28,120 @@ export class GoogleAuthService implements OnModuleInit {
   }
 
   isConfigured(): boolean {
-    return Boolean(this.cachedAccessToken || this.hasRefreshTokenConfig() || process.env.GOOGLE_ACCESS_TOKEN);
+    return Boolean(this.cachedAccessToken || this.hasRefreshTokenConfig());
+  }
+
+  /**
+   * Genera la URL de autorización de Google para el flujo 1-Click Login
+   */
+  getAuthUrl(redirectOrigin?: string): string {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      throw new Error('GOOGLE_CLIENT_ID no está configurado en .env');
+    }
+
+    const baseOrigin = redirectOrigin || process.env.APP_URL || 'https://evi.lambak.lat';
+    const redirectUri = `${baseOrigin}/api/auth/google/callback`;
+
+    const scopes = [
+      'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+    ].join(' ');
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: scopes,
+      access_type: 'offline', // Obligatorio para recibir Refresh Token
+      prompt: 'consent',     // Obligatorio para asegurar nuevo Refresh Token
+    });
+
+    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  }
+
+  /**
+   * Procesa el código de autorización recibido de Google y guarda el Refresh Token
+   */
+  async handleOAuthCallback(code: string, redirectOrigin?: string): Promise<{ success: boolean; message: string }> {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+      return { success: false, message: 'Faltan credenciales de Google Client en el servidor.' };
+    }
+
+    const baseOrigin = redirectOrigin || process.env.APP_URL || 'https://evi.lambak.lat';
+    const redirectUri = `${baseOrigin}/api/auth/google/callback`;
+
+    try {
+      this.logger.log(`Canjeando Authorization Code con Google OAuth2 (Redirect URI: ${redirectUri})...`);
+      const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          code: code.trim(),
+          grant_type: 'authorization_code',
+          redirect_uri: redirectUri,
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        this.logger.error(`Error al canjear código OAuth (${response.status}): ${errText}`);
+        return { success: false, message: `Error de Google (${response.status}): ${errText}` };
+      }
+
+      const data = await response.json();
+      if (data.access_token) {
+        this.cachedAccessToken = data.access_token;
+        const expiresIn = data.expires_in || 3600;
+        this.tokenExpiresAt = Date.now() + expiresIn * 1000;
+
+        if (data.refresh_token) {
+          process.env.GOOGLE_REFRESH_TOKEN = data.refresh_token;
+          this.persistRefreshTokenToEnv(data.refresh_token);
+          this.logger.log('🎉 [GOOGLE OAUTH2] ¡Nuevo Refresh Token obtenido y guardado permanentemente en .env!');
+        }
+
+        return { success: true, message: 'Cuenta de Google vinculada exitosamente.' };
+      }
+
+      return { success: false, message: 'Google no devolvió un access_token válido.' };
+    } catch (err: any) {
+      this.logger.error(`Excepción en OAuth Callback: ${err.message}`);
+      return { success: false, message: err.message };
+    }
+  }
+
+  /**
+   * Persiste el Refresh Token en el archivo .env del proyecto para que sobreviva reinicios
+   */
+  private persistRefreshTokenToEnv(newRefreshToken: string) {
+    try {
+      const rootEnvPath = path.resolve(process.cwd(), '..', '.env');
+      const localEnvPath = path.resolve(process.cwd(), '.env');
+      const targetPaths = [rootEnvPath, localEnvPath];
+
+      for (const envFile of targetPaths) {
+        if (fs.existsSync(envFile)) {
+          let content = fs.readFileSync(envFile, 'utf8');
+          if (content.includes('GOOGLE_REFRESH_TOKEN=')) {
+            content = content.replace(/GOOGLE_REFRESH_TOKEN=.*/g, `GOOGLE_REFRESH_TOKEN=${newRefreshToken}`);
+          } else {
+            content += `\nGOOGLE_REFRESH_TOKEN=${newRefreshToken}\n`;
+          }
+          fs.writeFileSync(envFile, content, 'utf8');
+          this.logger.log(`Archivo .env actualizado: ${envFile}`);
+        }
+      }
+    } catch (e: any) {
+      this.logger.warn(`No se pudo escribir en el archivo .env: ${e.message}`);
+    }
   }
 
   /**
@@ -36,12 +150,10 @@ export class GoogleAuthService implements OnModuleInit {
   async getAccessToken(): Promise<string | null> {
     const now = Date.now();
 
-    // Si el token en caché es válido por más de 3 minutos
     if (this.cachedAccessToken && this.tokenExpiresAt > now + 180 * 1000) {
       return this.cachedAccessToken;
     }
 
-    // Si podemos renovarlo automáticamente con Refresh Token
     if (this.hasRefreshTokenConfig()) {
       const refreshedToken = await this.forceRefreshToken();
       if (refreshedToken) {
@@ -49,7 +161,6 @@ export class GoogleAuthService implements OnModuleInit {
       }
     }
 
-    // Fallback a variable de entorno directa
     return this.cachedAccessToken || process.env.GOOGLE_ACCESS_TOKEN || null;
   }
 
@@ -62,7 +173,6 @@ export class GoogleAuthService implements OnModuleInit {
     const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
 
     if (!clientId || !clientSecret || !refreshToken) {
-      this.logger.warn('No se puede renovar token: faltan GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET o GOOGLE_REFRESH_TOKEN.');
       return this.cachedAccessToken;
     }
 
