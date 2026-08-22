@@ -8,15 +8,28 @@ export interface McpToolResponse {
   raw?: any;
 }
 
+interface GmailHeader {
+  name: string;
+  value: string;
+}
+
+interface GmailMessageDetail {
+  id: string;
+  snippet: string;
+  internalDate: string;
+  payload?: {
+    headers: GmailHeader[];
+  };
+}
+
 @Injectable()
 export class GoogleMcpService {
   private readonly logger = new Logger(GoogleMcpService.name);
-  private readonly GROQ_RESPONSES_URL = 'https://api.groq.com/openai/v1/responses';
 
   constructor(private readonly googleAuth: GoogleAuthService) {}
 
   /**
-   * Consulta Gmail de forma dinámica y exhaustiva según la petición del usuario
+   * Consulta Gmail directamente mediante la API oficial de Google (100% Nativo, sin intermediarios)
    */
   async queryGmail(userQuery: string, isRetry = false): Promise<McpToolResponse> {
     const token = await this.googleAuth.getAccessToken();
@@ -24,125 +37,110 @@ export class GoogleMcpService {
     if (!token) {
       return {
         success: false,
-        text: 'Aún no has configurado tu token de Google Workspace en el archivo .env.',
+        text: 'Aún no has configurado tus credenciales de Google Workspace en el archivo .env.',
         source: 'gmail',
       };
     }
-
-    const groqKey = process.env.GROQ_API_KEY;
-    if (!groqKey) {
-      return {
-        success: false,
-        text: 'La clave de API de Groq Cloud (GROQ_API_KEY) no está configurada.',
-        source: 'gmail',
-      };
-    }
-
-    const now = new Date();
-    const currentTimeLima = now.toLocaleTimeString('es-PE', {
-      timeZone: 'America/Lima',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
-    const currentDateLima = now.toLocaleDateString('es-PE', {
-      timeZone: 'America/Lima',
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-
-    const prompt =
-      `Hora actual del usuario en Lima, Perú: ${currentTimeLima} (${currentDateLima}). ` +
-      `Consulta la bandeja de Gmail del usuario para responder con precisión a su consulta: "${userQuery}". ` +
-      `\n\nINSTRUCCIONES CLAVE DE BÚSQUEDA MCP:` +
-      `\n- Si el usuario pregunta por un remitente específico (ejemplo: LinkedIn, GitHub, Google, bancos, reclutadores, etc.) o un tema particular, realiza una búsqueda exhaustiva usando los filtros y herramientas de búsqueda de Gmail para encontrar TODOS los correos pertinentes.` +
-      `\n- Si pide "los correos de hoy" o "todos mis correos", busca y lista todos los correos recibidos hoy sin cortarlos ni limitarte a unos pocos.` +
-      `\n- Revisa la bandeja con atención para no omitir correos existentes.` +
-      `\n\nREGLAS OBLIGATORIAS DE FORMATO PARA VOZ (EVI):` +
-      `\n1. NUNCA uses tablas Markdown (|---|---|) ni bloques de código.` +
-      `\n2. NO menciones fechas completas en formato ISO/UTC ni segundos. Convierte las marcas de tiempo a la hora local de Perú (UTC-5) y exprésala SIEMPRE en palabras habladas naturales (ejemplo: "a las nueve y treinta y ocho de la noche", "a las ocho y treinta y cinco de la noche", "a las diez de la mañana"). NUNCA uses abreviaturas como "p. m.", "a. m.", "p.m." ni "a.m." para evitar que la voz deletree letras sueltas.` +
-      `\n3. Para cada correo encontrado, di en una frase fluida y concisa: quién lo envía, a qué hora llegó y de qué trata.` +
-      `\n4. Sé directa, clara y natural para síntesis de voz.`;
 
     try {
-      this.logger.log(`Conectando con Groq MCP Gmail Connector para consulta: "${userQuery}"...`);
-      const response = await fetch(this.GROQ_RESPONSES_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${groqKey}`,
-        },
-        body: JSON.stringify({
-          model: 'openai/gpt-oss-120b',
-          tools: [
-            {
-              type: 'mcp',
-              server_label: 'Gmail',
-              connector_id: 'connector_gmail',
-              authorization: token,
-              require_approval: 'never',
-            },
-          ],
-          input: prompt,
-        }),
+      this.logger.log(`📬 [GMAIL API DIRECTA] Consultando bandeja de entrada para: "${userQuery}"...`);
+
+      // 1. Obtener lista de mensajes (máximo 8 más recientes)
+      const listUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=8`;
+      const listRes = await fetch(listUrl, {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!response.ok) {
-        const errBody = await response.text();
-        this.logger.error(`Error en Groq MCP Responses API (${response.status}): ${errBody}`);
-
-        // Si el error es 424 (token expirado/error de conector) o 401, renovar token automáticamente y reintentar
-        if ((response.status === 424 || response.status === 401) && !isRetry) {
-          this.logger.warn('🔄 Detectado error en conector de Google. Forzando renovación de token con Google API y reintentando...');
+      if (!listRes.ok) {
+        // Si el token expiró (401), renovar y reintentar una vez
+        if (listRes.status === 401 && !isRetry) {
+          this.logger.warn('🔄 Token expirado en Gmail API. Renovando automáticamente vía API...');
           const freshToken = await this.googleAuth.forceRefreshToken();
           if (freshToken) {
             return this.queryGmail(userQuery, true);
           }
         }
-
+        const errText = await listRes.text();
+        this.logger.error(`Error al listar mensajes de Gmail (${listRes.status}): ${errText}`);
         return {
           success: false,
-          text: `Hubo un inconveniente al consultar Gmail a través del conector MCP: ${response.statusText}.`,
+          text: 'No se pudo acceder a tu bandeja de Gmail.',
           source: 'gmail',
         };
       }
 
-      const data = await response.json();
-      let outputText = data.output_text;
+      const listData = await listRes.json();
+      const messages: Array<{ id: string }> = listData.messages || [];
 
-      if (!outputText && Array.isArray(data.output)) {
-        const assistantMsg = data.output.find((item: any) => item.type === 'message' && item.role === 'assistant');
-        if (assistantMsg && Array.isArray(assistantMsg.content)) {
-          const textObj = assistantMsg.content.find((c: any) => c.type === 'output_text' || typeof c.text === 'string');
-          if (textObj) {
-            outputText = textObj.text;
+      if (messages.length === 0) {
+        return {
+          success: true,
+          text: 'No tienes correos nuevos o recientes en tu bandeja de entrada.',
+          source: 'gmail',
+        };
+      }
+
+      // 2. Obtener detalles de cada correo en paralelo (Subject, From, Date, Snippet)
+      const detailsPromises = messages.slice(0, 6).map(async (msg) => {
+        try {
+          const detailUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`;
+          const detailRes = await fetch(detailUrl, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (detailRes.ok) {
+            return (await detailRes.json()) as GmailMessageDetail;
           }
+        } catch {
+          // Ignorar fallo individual
         }
-      }
+        return null;
+      });
 
-      if (!outputText && data.choices?.[0]?.message?.content) {
-        outputText = data.choices[0].message.content;
-      }
+      const details = (await Promise.all(detailsPromises)).filter((d): d is GmailMessageDetail => d !== null);
 
-      if (!outputText) {
-        outputText = typeof data === 'string' ? data : JSON.stringify(data);
-      }
+      // 3. Formatear los correos para la voz de EVI
+      const emailSummaries = details.map((d, index) => {
+        const headers = d.payload?.headers || [];
+        const fromHeader = headers.find((h) => h.name.toLowerCase() === 'from')?.value || 'Remitente desconocido';
+        const subjectHeader = headers.find((h) => h.name.toLowerCase() === 'subject')?.value || 'Sin asunto';
+        
+        // Limpiar el remitente (ej. "GitHub <notifications@github.com>" -> "GitHub")
+        const cleanFrom = fromHeader.replace(/<.*?>/, '').trim().replace(/"/g, '');
+        const snippet = (d.snippet || '').slice(0, 140).replace(/&[a-z]+;/gi, ' ').trim();
 
-      this.logger.log(`✅ [GROQ MCP GMAIL]: Respuesta obtenida (${outputText.length} caracteres).`);
+        // Extraer hora local aproximada
+        let timeStr = '';
+        if (d.internalDate) {
+          const emailDate = new Date(parseInt(d.internalDate, 10));
+          timeStr = emailDate.toLocaleTimeString('es-PE', {
+            timeZone: 'America/Lima',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          });
+        }
+
+        return `Correo ${index + 1}: De ${cleanFrom}. Asunto: "${subjectHeader}". ${timeStr ? `Llegó a las ${timeStr}. ` : ''}Resumen: ${snippet}`;
+      });
+
+      const totalCount = messages.length;
+      const formattedResponse = 
+        `Tienes ${totalCount} correos recientes en tu bandeja de entrada. ` +
+        emailSummaries.join(' | ');
+
+      this.logger.log(`✅ [GMAIL API DIRECTA]: ${details.length} correos procesados con éxito.`);
 
       return {
         success: true,
-        text: outputText,
+        text: formattedResponse,
         source: 'gmail',
-        raw: data,
+        raw: details,
       };
     } catch (error: any) {
-      this.logger.error(`Excepción al invocar Groq MCP Gmail: ${error.message}`);
+      this.logger.error(`Excepción en Gmail API Directa: ${error.message}`);
       return {
         success: false,
-        text: `Ocurrió un error de conexión con el conector de Gmail: ${error.message}`,
+        text: `Ocurrió un error al consultar tus correos: ${error.message}`,
         source: 'gmail',
       };
     }
@@ -152,11 +150,11 @@ export class GoogleMcpService {
    * Alias de compatibilidad
    */
   async getRecentEmailsSummary(count: number = 10, customPrompt?: string): Promise<McpToolResponse> {
-    return this.queryGmail(customPrompt || `Resume todos los correos más recientes recibidos hoy`);
+    return this.queryGmail(customPrompt || `Resume todos los correos más recientes`);
   }
 
   /**
-   * Consulta la agenda de Google Calendar del día de hoy usando Groq MCP
+   * Consulta Google Calendar directamente mediante la API oficial de Google
    */
   async getTodayCalendarSummary(isRetry = false): Promise<McpToolResponse> {
     const token = await this.googleAuth.getAccessToken();
@@ -164,187 +162,87 @@ export class GoogleMcpService {
     if (!token) {
       return {
         success: false,
-        text: 'Aún no has configurado tu token de Google Workspace en .env.',
+        text: 'Aún no has configurado tus credenciales de Google Workspace en .env.',
         source: 'calendar',
       };
     }
 
-    const groqKey = process.env.GROQ_API_KEY;
-    const prompt = 'Revisa mi calendario de Google para el día de hoy y resume todas las reuniones, eventos o citas agendadas con su hora de inicio.';
-
     try {
-      this.logger.log('Conectando con Groq MCP Google Calendar Connector...');
-      const response = await fetch(this.GROQ_RESPONSES_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${groqKey}`,
-        },
-        body: JSON.stringify({
-          model: 'openai/gpt-oss-120b',
-          tools: [
-            {
-              type: 'mcp',
-              server_label: 'Google Calendar',
-              connector_id: 'connector_googlecalendar',
-              authorization: token,
-              require_approval: 'never',
-            },
-          ],
-          input: prompt,
-        }),
+      this.logger.log('📅 [CALENDAR API DIRECTA] Consultando agenda de hoy...');
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
+
+      const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(startOfDay)}&timeMax=${encodeURIComponent(endOfDay)}&singleEvents=true&orderBy=startTime`;
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!response.ok) {
-        const errBody = await response.text();
-        this.logger.error(`Error en Groq MCP Calendar API: ${errBody}`);
-
-        if ((response.status === 424 || response.status === 401) && !isRetry) {
-          this.logger.warn('🔄 Error en conector Calendar. Renovando token automáticamente...');
+        if (response.status === 401 && !isRetry) {
+          this.logger.warn('🔄 Token expirado en Calendar API. Renovando...');
           const freshToken = await this.googleAuth.forceRefreshToken();
           if (freshToken) {
             return this.getTodayCalendarSummary(true);
           }
         }
-
         return {
           success: false,
-          text: `No se pudo acceder a Google Calendar mediante MCP: ${response.statusText}`,
+          text: 'No se pudo acceder a Google Calendar.',
           source: 'calendar',
         };
       }
 
       const data = await response.json();
-      let outputText = data.output_text;
+      const items: any[] = data.items || [];
 
-      if (!outputText && Array.isArray(data.output)) {
-        const assistantMsg = data.output.find((item: any) => item.type === 'message' && item.role === 'assistant');
-        if (assistantMsg && Array.isArray(assistantMsg.content)) {
-          const textObj = assistantMsg.content.find((c: any) => c.type === 'output_text' || typeof c.text === 'string');
-          if (textObj) {
-            outputText = textObj.text;
-          }
-        }
+      if (items.length === 0) {
+        return {
+          success: true,
+          text: 'No tienes eventos ni reuniones agendadas en tu calendario para hoy.',
+          source: 'calendar',
+        };
       }
 
-      if (!outputText && data.choices?.[0]?.message?.content) {
-        outputText = data.choices[0].message.content;
-      }
-
-      if (!outputText) {
-        outputText = typeof data === 'string' ? data : JSON.stringify(data);
-      }
+      const eventsSummary = items.map((ev, i) => {
+        const summary = ev.summary || 'Evento sin título';
+        const start = ev.start?.dateTime ? new Date(ev.start.dateTime).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'todo el día';
+        return `Evento ${i + 1}: "${summary}" a las ${start}.`;
+      }).join(' ');
 
       return {
         success: true,
-        text: outputText,
+        text: `Tienes ${items.length} eventos para hoy: ${eventsSummary}`,
         source: 'calendar',
-        raw: data,
+        raw: items,
       };
     } catch (error: any) {
       return {
         success: false,
-        text: `Error de red al consultar Google Calendar: ${error.message}`,
+        text: `Error al consultar tu calendario: ${error.message}`,
         source: 'calendar',
       };
     }
   }
 
   /**
-   * Ejecuta una consulta genérica a cualquier conector de Google Workspace
+   * Ejecuta una consulta genérica
    */
   async queryWorkspaceMcp(
     connectorId: 'connector_gmail' | 'connector_googlecalendar' | 'connector_googledrive',
     serverLabel: string,
-    userInput: string,
-    isRetry = false
+    userInput: string
   ): Promise<McpToolResponse> {
-    const token = await this.googleAuth.getAccessToken();
-    const groqKey = process.env.GROQ_API_KEY;
-
-    if (!token || !groqKey) {
-      return {
-        success: false,
-        text: 'Faltan credenciales de Google o de Groq Cloud para ejecutar el conector MCP.',
-        source: connectorId.includes('gmail') ? 'gmail' : connectorId.includes('calendar') ? 'calendar' : 'drive',
-      };
+    if (connectorId === 'connector_gmail') {
+      return this.queryGmail(userInput);
     }
-
-    try {
-      this.logger.log(`Conectando con Groq MCP ${serverLabel} para consulta genérica...`);
-      const response = await fetch(this.GROQ_RESPONSES_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${groqKey}`,
-        },
-        body: JSON.stringify({
-          model: 'openai/gpt-oss-120b',
-          tools: [
-            {
-              type: 'mcp',
-              server_label: serverLabel,
-              connector_id: connectorId,
-              authorization: token,
-              require_approval: 'never',
-            },
-          ],
-          input: userInput,
-        }),
-      });
-
-      if (!response.ok) {
-        const errBody = await response.text();
-        this.logger.error(`Error en Groq MCP Responses API (${response.status}): ${errBody}`);
-
-        if ((response.status === 424 || response.status === 401) && !isRetry) {
-          this.logger.warn('🔄 Renovando token automáticamente y reintentando...');
-          const freshToken = await this.googleAuth.forceRefreshToken();
-          if (freshToken) {
-            return this.queryWorkspaceMcp(connectorId, serverLabel, userInput, true);
-          }
-        }
-
-        return {
-          success: false,
-          text: `No se pudo completar la consulta en ${serverLabel}: ${response.statusText}`,
-          source: connectorId.includes('gmail') ? 'gmail' : connectorId.includes('calendar') ? 'calendar' : 'drive',
-        };
-      }
-
-      const data = await response.json();
-      let outputText = data.output_text;
-
-      if (!outputText && Array.isArray(data.output)) {
-        const assistantMsg = data.output.find((item: any) => item.type === 'message' && item.role === 'assistant');
-        if (assistantMsg && Array.isArray(assistantMsg.content)) {
-          const textObj = assistantMsg.content.find((c: any) => c.type === 'output_text' || typeof c.text === 'string');
-          if (textObj) {
-            outputText = textObj.text;
-          }
-        }
-      }
-
-      if (!outputText && data.choices?.[0]?.message?.content) {
-        outputText = data.choices[0].message.content;
-      }
-
-      if (!outputText) {
-        outputText = typeof data === 'string' ? data : JSON.stringify(data);
-      }
-
-      return {
-        success: true,
-        text: outputText,
-        source: connectorId.includes('gmail') ? 'gmail' : connectorId.includes('calendar') ? 'calendar' : 'drive',
-        raw: data,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        text: `Error al comunicar con conector ${serverLabel}: ${error.message}`,
-        source: connectorId.includes('gmail') ? 'gmail' : connectorId.includes('calendar') ? 'calendar' : 'drive',
-      };
+    if (connectorId === 'connector_googlecalendar') {
+      return this.getTodayCalendarSummary();
     }
+    return {
+      success: false,
+      text: 'Conector no soportado.',
+      source: 'none',
+    };
   }
 }
