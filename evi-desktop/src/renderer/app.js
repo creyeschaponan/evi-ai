@@ -634,26 +634,36 @@ function stopVoiceCapture() {
     micStream = null;
   }
 
-  if (recordedPcmChunks.length === 0) {
-    setCoreState('STANDBY');
-    return;
-  }
-
-  setCoreState('THINKING');
-
   // Convert collected float chunks to 16-bit 16kHz PCM
   const totalLength = recordedPcmChunks.reduce((acc, c) => acc + c.length, 0);
-  if (totalLength === 0) {
+  if (totalLength === 0 || totalLength < 16000 * 0.4) {
+    // Muy corto (< 400ms), descartar
     setCoreState('STANDBY');
     return;
   }
 
   const merged = new Float32Array(totalLength);
   let offset = 0;
+  let sumSquares = 0;
   for (const chunk of recordedPcmChunks) {
     merged.set(chunk, offset);
     offset += chunk.length;
   }
+
+  // Calcular energía RMS para filtrar silencio y ruido de fondo
+  for (let i = 0; i < merged.length; i++) {
+    sumSquares += merged[i] * merged[i];
+  }
+  const rms = Math.sqrt(sumSquares / merged.length);
+
+  // Si el audio es silencio (RMS < 0.01) descartar para evitar alucinaciones de Whisper
+  if (rms < 0.01) {
+    console.log(`[Audio Filter] Audio ignorado por bajo nivel de energía/silencio (RMS: ${rms.toFixed(4)})`);
+    setCoreState('STANDBY');
+    return;
+  }
+
+  setCoreState('THINKING');
 
   const pcm16Buffer = export16BitPCM(merged, audioCtx.sampleRate, 16000);
   const base64Audio = btoa(

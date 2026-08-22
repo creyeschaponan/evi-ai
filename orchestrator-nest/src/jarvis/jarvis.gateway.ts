@@ -222,9 +222,23 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
           : Buffer.from(audioPayload.buffer);
 
       const rate = audioPayload.rate || 16000;
-      const transcript = await this.sttService.transcribeAudio(rawBuffer, rate);
+      let transcript = await this.sttService.transcribeAudio(rawBuffer, rate);
 
-      if (transcript && transcript.trim().length > 0) {
+      // 1. Filtrar alucinaciones de caracteres no latinos (Tamil, Chino, etc.) generadas por ruido/silencio
+      const nonLatinRegex = /[^\u0000-\u024F\u1E00-\u1EFF\s.,!?:;¿?¡"'\-0-9]/;
+      if (nonLatinRegex.test(transcript)) {
+        this.logger.warn(`⚠️ [WHISPER HALLUCINATION FILTERED]: "${transcript}" descartado por contener caracteres no válidos.`);
+        transcript = '';
+      }
+
+      // 2. Normalizar fonética común ("Ebi", "Ébi", "Heavy", "Hevi", "Edi" -> "EVI")
+      if (transcript) {
+        transcript = transcript
+          .replace(/\b(ebi|ébi|hevi|heavy|edi|evy|ebbi)\b/gi, 'EVI')
+          .trim();
+      }
+
+      if (transcript && transcript.length > 0) {
         client.emit('stt_transcription', transcript);
         await this.handleVoiceText(transcript, client);
       } else {
@@ -233,7 +247,7 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
     } catch (err) {
       this.logger.error(`Error processing voice audio: ${err.message}`);
-      client.emit('error', { message: 'Error transcribiendo audio' });
+      client.emit('response_finished');
     }
   }
 
