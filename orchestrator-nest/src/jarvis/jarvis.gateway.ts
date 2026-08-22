@@ -204,11 +204,11 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
         lowerQuery.includes('eventos de hoy');
 
       if (isGmailIntent) {
-        this.logger.log(`📬 [GMAIL INTENT DETECTED]: Consultando Groq MCP Gmail Connector...`);
+        this.logger.log(`📬 [GMAIL INTENT DETECTED]: Consultando Groq MCP Gmail con: "${queryText}"...`);
         try {
-          const mcpResult = await this.googleMcpService.getRecentEmailsSummary(5, queryText);
+          const mcpResult = await this.googleMcpService.queryGmail(queryText);
           if (mcpResult && mcpResult.text) {
-            actionResultContext = `[RESULTADO DE TU BANDEJA DE GMAIL VIA MCP]: ${mcpResult.text}`;
+            actionResultContext = `[DATOS DE GMAIL EN VIVO]: ${mcpResult.text}`;
           }
         } catch (mcpErr: any) {
           this.logger.warn(`Error en Google MCP Gmail: ${mcpErr.message}`);
