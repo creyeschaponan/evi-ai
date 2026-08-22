@@ -181,7 +181,12 @@ export class WyomingClient {
       let incomingBuffer = Buffer.alloc(0);
 
       client.connect(port, host, () => {
-        WyomingClient.sendEvent(client, 'audio-start', { rate, width, channels });
+        WyomingClient.sendEvent(client, 'audio-start', {
+          rate,
+          width,
+          channels,
+          language: 'es',
+        });
 
         const chunkSize = 2048;
         for (let i = 0; i < pcmAudio.length; i += chunkSize) {
