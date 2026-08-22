@@ -35,8 +35,8 @@ TRIGGER_ENDPOINT = f"{ORCHESTRATOR_URL}/api/wakeword/trigger"
 # Parametros de Audio y Deteccion Optimizados
 SAMPLE_RATE = 16000
 CHUNK_SAMPLES = 1280       # 80 ms por frame
-AUDIO_GAIN = 1.8           # Ganancia de microfono para igualar niveles de entrenamiento
-DETECTION_THRESHOLD = 0.18 # Umbral calibrado para capturar "Hey EVI" rapido y corto
+AUDIO_GAIN = 2.2           # Ganancia de microfono para capturar voz con volumen suave
+DETECTION_THRESHOLD = 0.12 # Umbral calibrado (silencio ambiente es 0.00, voz supera 0.20)
 COOLDOWN_SECONDS = 1.4     # Tiempo entre disparos
 
 def trigger_orchestrator(score: float, model_name: str = "hey_evi"):
