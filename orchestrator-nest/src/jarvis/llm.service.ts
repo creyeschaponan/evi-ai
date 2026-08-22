@@ -1,17 +1,75 @@
 import { Injectable, Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 
+export type LlmProviderType = 'groq' | 'gemini' | 'local';
+
+export interface LlmConfig {
+  provider: LlmProviderType;
+  model: string;
+  groqApiKey?: string;
+  geminiApiKey?: string;
+  localUrl?: string;
+}
+
 @Injectable()
 export class LlmService {
   private readonly logger = new Logger(LlmService.name);
-  private openai: OpenAI;
-  private readonly modelName = process.env.LLM_MODEL || 'qwen3-8b';
+  
+  private activeProvider: LlmProviderType = (process.env.LLM_PROVIDER as LlmProviderType) || 'local';
+  private groqClient?: OpenAI;
+  private geminiClient?: OpenAI;
+  private localClient: OpenAI;
+
+  private groqModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  private geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  private localModel = process.env.LLM_MODEL || 'Qwen3-8B';
 
   constructor() {
-    const baseURL = process.env.LLM_API_URL || 'http://localhost:8080/v1';
-    const apiKey = process.env.LLM_API_KEY || 'not-needed';
-    this.openai = new OpenAI({ baseURL, apiKey });
-    this.logger.log(`Initialized LLM client pointing to ${baseURL}`);
+    // 1. Cliente Local (llama.cpp / Ollama)
+    const localUrl = process.env.LLM_BASE_URL || process.env.LLM_API_URL || 'http://localhost:8080/v1';
+    this.localClient = new OpenAI({ baseURL: localUrl, apiKey: 'not-needed' });
+
+    // 2. Cliente Groq Cloud (Ultra-Fast 800 tps)
+    const groqKey = process.env.GROQ_API_KEY;
+    if (groqKey && groqKey.trim().length > 0) {
+      this.groqClient = new OpenAI({
+        baseURL: 'https://api.groq.com/openai/v1',
+        apiKey: groqKey.trim(),
+      });
+      this.logger.log(`⚡ [Groq Cloud LLM Active]: Model ${this.groqModel}`);
+    }
+
+    // 3. Cliente Google Gemini Flash (OpenAI API Compatible)
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey && geminiKey.trim().length > 0) {
+      this.geminiClient = new OpenAI({
+        baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+        apiKey: geminiKey.trim(),
+      });
+      this.logger.log(`✨ [Google Gemini Flash Active]: Model ${this.geminiModel}`);
+    }
+
+    this.logger.log(`Active LLM Provider: [${this.activeProvider}]`);
+  }
+
+  setProvider(provider: LlmProviderType) {
+    this.activeProvider = provider;
+    this.logger.log(`Switched active LLM provider to: [${provider}]`);
+  }
+
+  setApiKeys(groqKey?: string, geminiKey?: string) {
+    if (groqKey) {
+      this.groqClient = new OpenAI({
+        baseURL: 'https://api.groq.com/openai/v1',
+        apiKey: groqKey.trim(),
+      });
+    }
+    if (geminiKey) {
+      this.geminiClient = new OpenAI({
+        baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+        apiKey: geminiKey.trim(),
+      });
+    }
   }
 
   async *streamResponse(
@@ -81,9 +139,21 @@ EJEMPLOS DE RESPUESTAS CORRECTAS:
         content: msg.content,
       }));
 
+    let clientToUse = this.localClient;
+    let modelToUse = this.localModel;
+
+    if (this.activeProvider === 'groq' && this.groqClient) {
+      clientToUse = this.groqClient;
+      modelToUse = this.groqModel;
+    } else if (this.activeProvider === 'gemini' && this.geminiClient) {
+      clientToUse = this.geminiClient;
+      modelToUse = this.geminiModel;
+    }
+
     try {
-      const stream = await this.openai.chat.completions.create({
-        model: this.modelName,
+      this.logger.log(`Invoking LLM [${this.activeProvider}] -> Model: ${modelToUse}...`);
+      const stream = await clientToUse.chat.completions.create({
+        model: modelToUse,
         messages: [
           { role: 'system', content: systemPrompt },
           ...formattedHistory,
@@ -131,7 +201,32 @@ EJEMPLOS DE RESPUESTAS CORRECTAS:
         yield tokenBuffer;
       }
     } catch (error) {
-      this.logger.error(`Error streaming LLM response: ${error.message}`);
+      this.logger.error(`Error in LLM [${this.activeProvider}]: ${error.message}`);
+      
+      // Fallback a Local si falló Cloud
+      if (clientToUse !== this.localClient) {
+        this.logger.warn(`Falling back to Local GPU LLM (${this.localModel})...`);
+        try {
+          const fallbackStream = await this.localClient.chat.completions.create({
+            model: this.localModel,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              ...formattedHistory,
+              { role: 'user', content: userQuery },
+            ],
+            stream: true,
+            temperature: 0.4,
+          });
+          for await (const chunk of fallbackStream) {
+            const token = chunk.choices[0]?.delta?.content || '';
+            if (token) yield token;
+          }
+          return;
+        } catch (fErr) {
+          this.logger.error(`Fallback also failed: ${fErr.message}`);
+        }
+      }
+
       yield 'Tuve una pequeña interferencia en el modelo, pero ya estoy lista.';
     }
   }
