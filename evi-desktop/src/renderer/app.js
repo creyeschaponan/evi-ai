@@ -602,9 +602,14 @@ async function startVoiceCapture() {
     pcmProcessor = audioCtx.createScriptProcessor(4096, 1, 1);
     recordedPcmChunks = [];
 
+    // Mute gain node para no escuchar tu propia voz por los audífonos
+    const muteGain = audioCtx.createGain();
+    muteGain.gain.value = 0;
+
     source.connect(analyser);
     source.connect(pcmProcessor);
-    pcmProcessor.connect(audioCtx.destination);
+    pcmProcessor.connect(muteGain);
+    muteGain.connect(audioCtx.destination);
 
     pcmProcessor.onaudioprocess = (e) => {
       if (!isRecording) return;

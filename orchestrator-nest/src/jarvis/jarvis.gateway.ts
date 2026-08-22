@@ -162,18 +162,25 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
       fullAssistantResponse += token;
       client.emit('text_token', token);
 
-      // Corte agresivo: siempre usar comas como delimitadores para mantener baja la latencia
-      // Para el primerísimo chunk, cortar con apenas 10 chars + cualquier puntuación
-      const minLength = chunkIndex === 0 ? 10 : 20;
+      const isFirst = chunkIndex === 0;
 
-      if (sentenceBuffer.length > minLength) {
-        const splitRegex = /([,;:.?!\n]+)/;
-        const match = splitRegex.exec(sentenceBuffer);
-        if (match) {
-          const sentenceEndIndex = match.index + match[0].length;
+      // 1. Fin de oración fuerte (. ? ! : \n)
+      const majorRegex = /([:.?!\n]+)/;
+      const majorMatch = majorRegex.exec(sentenceBuffer);
+
+      if (majorMatch && sentenceBuffer.length >= (isFirst ? 20 : 30)) {
+        const sentenceEndIndex = majorMatch.index + majorMatch[0].length;
+        const completeSentence = sentenceBuffer.substring(0, sentenceEndIndex).trim();
+        sentenceBuffer = sentenceBuffer.substring(sentenceEndIndex);
+        dispatchAudioChunk(completeSentence);
+      } else if (sentenceBuffer.length >= (isFirst ? 25 : 50)) {
+        // 2. Comas (,) solo si la frase acumulada ya tiene cuerpo completo
+        const commaRegex = /([,;]+)/;
+        const commaMatch = commaRegex.exec(sentenceBuffer);
+        if (commaMatch) {
+          const sentenceEndIndex = commaMatch.index + commaMatch[0].length;
           const completeSentence = sentenceBuffer.substring(0, sentenceEndIndex).trim();
           sentenceBuffer = sentenceBuffer.substring(sentenceEndIndex);
-
           dispatchAudioChunk(completeSentence);
         }
       }
