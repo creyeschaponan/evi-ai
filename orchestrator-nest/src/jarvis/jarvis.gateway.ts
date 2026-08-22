@@ -60,10 +60,9 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (controller) {
       controller.abort();
       this.activeAbortControllers.delete(client.id);
-      this.logger.log(`🛑 [USER INTERRUPT]: Generation cancelled by client ${client.id}`);
+      this.logger.log(`🛑 [USER INTERRUPT]: Generation cancelled for client ${client.id}`);
     }
     client.emit('interrupted');
-    client.emit('response_finished');
     return { success: true };
   }
 

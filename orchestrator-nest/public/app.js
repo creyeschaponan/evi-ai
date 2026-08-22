@@ -199,6 +199,8 @@ let isPlayingAudio = false;
 let currentPlayingAudio = null;
 
 function stopAndInterruptPlayback() {
+  const wasSpeaking = isPlayingAudio || currentCoreState === 'SPEAKING' || currentCoreState === 'THINKING';
+
   if (currentPlayingAudio) {
     try {
       currentPlayingAudio.pause();
@@ -208,7 +210,10 @@ function stopAndInterruptPlayback() {
   }
   audioPlaybackQueue.length = 0;
   isPlayingAudio = false;
-  socket.emit('interrupt');
+
+  if (wasSpeaking) {
+    socket.emit('interrupt');
+  }
 }
 
 function playNextAudioChunk() {
