@@ -451,10 +451,20 @@ document.querySelectorAll('.chip-btn-cyber').forEach(btn => {
 });
 
 // =====================================================================
-// Socket Streaming & Welcome Briefing
+// Socket Streaming, Wake Word & Welcome Briefing
 // =====================================================================
 let currentEviCard = null;
 let currentEviTextElem = null;
+
+// Wake Word Triggered ("Hey EVI" / "Hola EVI" detectado por el listener local)
+socket.on('wake_word_detected', (data) => {
+  console.log('⚡ [WAKE WORD DETECTED IN CLIENT]:', data);
+  if (window.electronAPI?.triggerWakeWord) {
+    window.electronAPI.triggerWakeWord();
+  }
+  stopAndInterruptPlayback();
+  startVoiceCapture();
+});
 
 socket.on('text_token', (token) => {
   if (currentCoreState !== 'SPEAKING') {

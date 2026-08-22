@@ -76,6 +76,23 @@ export class JarvisGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  broadcastWakeWord(model: string = 'hey_evi', score: number = 1.0) {
+    if (this.server) {
+      this.server.emit('wake_word_detected', { model, score, timestamp: Date.now() });
+      this.logger.log(`📢 [WAKE WORD BROADCAST] -> Emitted 'wake_word_detected' (model: ${model}, score: ${score})`);
+    }
+  }
+
+  @SubscribeMessage('wake_word_triggered')
+  handleWakeWordTriggered(
+    @MessageBody() payload: { model?: string; score?: number },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.logger.log(`⚡ [WAKE WORD DETECTED FROM CLIENT ${client.id}] Model: ${payload?.model || 'hey_evi'}`);
+    this.broadcastWakeWord(payload?.model || 'hey_evi', payload?.score || 1.0);
+    return { success: true };
+  }
+
   @SubscribeMessage('update_ack_mode')
   handleUpdateAckMode(
     @MessageBody() payload: { mode: 'static' | 'pre_llm' },

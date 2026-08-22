@@ -256,4 +256,21 @@ export class RagService implements OnModuleInit, OnModuleDestroy {
       this.logger.error(`Error saving knowledge: ${err.message}`);
     }
   }
+
+  /**
+   * Get all stored memories for UI management
+   */
+  async getAllMemories(): Promise<Array<{ id: number; content: string; category: string; created_at: Date }>> {
+    if (!this.pool) return [];
+    try {
+      const result = await this.pool.query(
+        'SELECT id, memory_text as content, category, created_at FROM jarvis_memories ORDER BY created_at DESC LIMIT 50',
+      );
+      return result.rows;
+    } catch (err: any) {
+      this.logger.warn(`Could not get all memories: ${err.message}`);
+      return [];
+    }
+  }
 }
+

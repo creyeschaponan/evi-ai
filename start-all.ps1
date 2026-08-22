@@ -45,9 +45,15 @@ if ($dockerRunning) {
 }
 
 # -------------------------------------------------------------
-# 2. Verificar y levantar Orquestador NestJS (Puerto 3000)
+# 2. Iniciar Wake Word Listener Daemon ("Hey EVI")
 # -------------------------------------------------------------
-Write-Host "`n[2/2] Iniciando Orquestador NestJS & Cockpit..." -ForegroundColor Yellow
+Write-Host "`n[2/3] Iniciando Daemon de Wake Word ('Hey EVI')..." -ForegroundColor Cyan
+Start-Process powershell -ArgumentList "-NoExit", "-File", "$PSScriptRoot\start-wakeword.ps1"
+
+# -------------------------------------------------------------
+# 3. Verificar y levantar Orquestador NestJS (Puerto 3000)
+# -------------------------------------------------------------
+Write-Host "`n[3/3] Iniciando Orquestador NestJS & Cockpit..." -ForegroundColor Yellow
 
 if (Test-PortOpen 3000) {
     Write-Host "  [OK] El Orquestador NestJS ya esta activo en puerto 3000." -ForegroundColor Green

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { JarvisGateway } from './jarvis.gateway';
+import { JarvisController } from './jarvis.controller';
 import { LlmService } from './llm.service';
 import { TtsService } from './tts.service';
 import { PiperTtsProvider } from './tts/piper-tts.provider';
@@ -16,6 +17,7 @@ import { GoogleAuthService } from './google-auth.service';
 import { GoogleMcpService } from './google-mcp.service';
 
 @Module({
+  controllers: [JarvisController],
   providers: [
     JarvisGateway,
     LlmService,
