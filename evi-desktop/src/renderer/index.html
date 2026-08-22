@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EVI Desktop — Enhanced Virtual Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;1,400&family=Orbitron:wght@400;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="vendor/socket.io.min.js"></script>
+</head>
+<body>
+  <!-- Custom Frameless Titlebar para Windows -->
+  <div class="custom-titlebar">
+    <div class="titlebar-drag-region">
+      <div class="titlebar-brand">
+        <img src="../../assets/tray-icon.png" alt="EVI" class="titlebar-icon">
+        <span class="titlebar-title">E.V.I. // DESKTOP SYSTEM HUD</span>
+        <span class="titlebar-version">v3.0</span>
+      </div>
+    </div>
+    <div class="titlebar-controls">
+      <button class="titlebar-btn" id="btnMinimize" title="Minimizar a barra de tareas">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
+      <button class="titlebar-btn" id="btnMaximize" title="Maximizar ventana">
+        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+        </svg>
+      </button>
+      <button class="titlebar-btn btn-close" id="btnClose" title="Ocultar en segundo plano (Bandeja del sistema)">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Fondo Holográfico Cyberpunk con Rejilla y Partículas -->
+  <div class="hologram-background">
+    <div class="grid-overlay"></div>
+    <div class="scanlines"></div>
+    <div class="glow-orb glow-orb-pink"></div>
+    <div class="glow-orb glow-orb-cyan"></div>
+    <div class="glow-orb glow-orb-purple"></div>
+  </div>
+
+  <div class="hud-container">
+    <!-- Header Táctico HUD Jarvis / Cyberpunk -->
+    <header class="hud-header">
+      <div class="header-left">
+        <div class="brand-badge">
+          <span class="hud-corner top-left"></span>
+          <span class="hud-corner bottom-right"></span>
+          <div class="brand-icon">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+              <polyline points="2 17 12 22 22 17"></polyline>
+              <polyline points="2 12 12 17 22 12"></polyline>
+            </svg>
+          </div>
+          <div>
+            <h1 class="brand-title">E.V.I. <span class="brand-version">DESKTOP</span></h1>
+            <p class="brand-subtitle">JARVIS CYBERPUNK HUD // ALWAYS-ON VOICE AI</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="status-pill" id="connectionStatusPill">
+          <span class="pulse-dot" id="statusPulseDot"></span>
+          <span id="statusLabel">SISTEMA EN LÍNEA // GPU CUDA ACTIVA</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- Switch Modo Alexa / Push-to-Talk -->
+        <div class="mode-toggle-deck" id="modeToggleContainer">
+          <button class="hud-btn-mode active-alexa" id="toggleListeningModeBtn" title="Cambiar modo de escucha (Alexa vs Push-to-Talk)">
+            <span class="mode-icon" id="modeIcon">🎙️</span>
+            <span class="mode-label" id="modeLabel">MODO ALEXA ("EVI")</span>
+          </button>
+        </div>
+
+        <button class="hud-btn-cyber pink" id="syncRagBtn" title="Sincronizar base de conocimiento con pgvector">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+          </svg>
+          <span>SYNC RAG</span>
+        </button>
+        <button class="hud-btn-cyber cyan" id="openMemoryModalBtn" title="Consultar y gestionar memorias">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 15h-2v-6h2zm0-8h-2V7h2z"/>
+          </svg>
+          <span>MEMORIA</span>
+        </button>
+        <button class="hud-btn-cyber purple" id="openSettingsModalBtn" title="Configuración de EVI Desktop">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>AJUSTES</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Toolbar Táctica de Voz y Motor TTS -->
+    <div class="hud-voice-toolbar">
+      <div class="voice-toolbar-group">
+        <label for="ttsEngineSelect" class="toolbar-label">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="22"></line>
+          </svg>
+          MOTOR TTS:
+        </label>
+        <select id="ttsEngineSelect" class="hud-select">
+          <option value="cosyvoice" selected>CosyVoice 3 (Alibaba FunAudioLLM)</option>
+          <option value="edge">Microsoft Neural (Edge-TTS)</option>
+          <option value="piper">Piper TTS (100% Local Docker)</option>
+          <option value="chatterbox">Chatterbox TTS (Local Neural)</option>
+        </select>
+      </div>
+
+      <div class="voice-toolbar-group">
+        <label for="ttsVoiceSelect" class="toolbar-label">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+            <line x1="9" y1="9" x2="9.01" y2="9"></line>
+            <line x1="15" y1="9" x2="15.01" y2="9"></line>
+          </svg>
+          VOZ:
+        </label>
+        <select id="ttsVoiceSelect" class="hud-select">
+          <!-- Opciones dinámicas -->
+        </select>
+      </div>
+
+      <div class="voice-toolbar-group rate-group">
+        <label for="ttsRateSlider" class="toolbar-label">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polyline>
+          </svg>
+          VELOCIDAD: <span id="ttsRateDisplay">+30%</span>
+        </label>
+        <input type="range" id="ttsRateSlider" min="-20" max="50" step="5" value="30" class="hud-slider">
+      </div>
+
+      <div class="voice-toolbar-badge" id="ttsEngineBadge">
+        <span class="badge-dot"></span>
+        <span id="ttsEngineBadgeText">COSYVOICE 3 // EMOCIONAL</span>
+      </div>
+    </div>
+
+    <!-- Main Grid: Core Reactor & Live Stream -->
+    <main class="hud-main-grid">
+      <!-- Columna Izquierda: Reactor Central y Visualizador -->
+      <section class="hud-card core-section">
+        <div class="card-header">
+          <span class="card-tag">ARC REACTOR // QUANTUM VOICE CORE</span>
+          <span class="card-status-badge" id="coreStateBadge">STANDBY</span>
+        </div>
+
+        <!-- Reactor Holográfico Central (Jarvis Arc Reactor Style) -->
+        <div class="reactor-wrapper">
+          <!-- Anillos Giratorios Externos -->
+          <div class="hud-ring ring-outer"></div>
+          <div class="hud-ring ring-middle"></div>
+          <div class="hud-ring ring-inner"></div>
+          <div class="hud-ring ring-ticks"></div>
+
+          <!-- Canvas para Ondas de Audio en Tiempo Real -->
+          <canvas id="visualizerCanvas" class="visualizer-canvas" width="300" height="300"></canvas>
+
+          <!-- Núcleo Central Interactivo -->
+          <div class="core-center" id="voiceCoreBtn" title="Presiona o di 'EVI' para hablar">
+            <div class="core-spider-logo">
+              <svg viewBox="0 0 100 100" class="spider-svg">
+                <circle cx="50" cy="50" r="44" stroke="currentColor" stroke-width="1.5" fill="none" stroke-dasharray="4 6" />
+                <polygon points="50,14 66,28 66,72 50,86 34,72 34,28" fill="rgba(255, 0, 127, 0.18)" stroke="currentColor" stroke-width="2"/>
+                <circle cx="50" cy="50" r="16" fill="url(#coreGlowPink)" stroke="currentColor" stroke-width="2"/>
+                <defs>
+                  <radialGradient id="coreGlowPink" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#ff007f" stop-opacity="0.95"/>
+                    <stop offset="70%" stop-color="#8b5cf6" stop-opacity="0.6"/>
+                    <stop offset="100%" stop-color="#00f0ff" stop-opacity="0.2"/>
+                  </radialGradient>
+                </defs>
+              </svg>
+            </div>
+            <div class="core-pulse-wave"></div>
+          </div>
+        </div>
+
+        <!-- Feedback de Voz y Estado -->
+        <div class="voice-state-feedback">
+          <div class="voice-prompt-text" id="voicePromptText">DI "EVI" O PRESIONA [ESPACIO] PARA HABLAR</div>
+          <div class="voice-subtext" id="voiceSubtext">Escucha continua activa // Modo Alexa operativo</div>
+        </div>
+
+        <!-- Telemetría de Infraestructura Local -->
+        <div class="telemetry-grid">
+          <div class="telemetry-item">
+            <span class="tel-label">GPU HARDWARE</span>
+            <span class="tel-val pink">RTX 3060 CUDA</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="tel-label">LLM ENGINE</span>
+            <span class="tel-val cyan">QWEN 14B / 8B</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="tel-label">WAKE WORD</span>
+            <span class="tel-val purple" id="telWakeWordStatus">ON // "EVI"</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="tel-label">TTS ENGINE</span>
+            <span class="tel-val magenta">COSYVOICE 3</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Columna Derecha: Consola Táctica de Conversación -->
+      <section class="hud-card stream-section">
+        <div class="card-header">
+          <span class="card-tag">HOLOGRAPHIC STREAM // DIÁLOGO TÁCTICO</span>
+          <div class="header-actions">
+            <button class="btn-icon-cyber" id="clearStreamBtn" title="Limpiar historial de pantalla">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Feed de Mensajes -->
+        <div class="dialogue-feed" id="dialogueFeed">
+          <div class="message-card evi-message">
+            <div class="msg-avatar">EVI</div>
+            <div class="msg-content">
+              <div class="msg-sender">E.V.I. <span class="msg-time" id="initTime"></span></div>
+              <div class="msg-text">Todos los sistemas de escritorio están operativos. Estoy atenta: solo di "EVI" o escribe cuando gustes.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chips de Comandos Rápidos -->
+        <div class="quick-chips-bar">
+          <button class="chip-btn-cyber" data-query="¿Cómo está el clima hoy en Lima?">🌦️ Clima en Lima</button>
+          <button class="chip-btn-cyber" data-query="¿Cómo están los recursos del sistema y hardware?">⚡ Estado GPU / RAM</button>
+          <button class="chip-btn-cyber" data-query="Pon música para programar en YouTube">🎵 Música en YouTube</button>
+          <button class="chip-btn-cyber" data-query="Sube el volumen al 50%">🔊 Volumen 50%</button>
+          <button class="chip-btn-cyber" data-query="¿Qué recuerdas sobre mí y mis preferencias?">🧠 Mis Preferencias</button>
+        </div>
+
+        <!-- Input Deck Bar -->
+        <div class="input-deck">
+          <div class="input-wrapper">
+            <input type="text" id="queryInput" placeholder="Escribe tu comando o consulta para EVI..." autocomplete="off" />
+            <button class="send-btn-cyber" id="sendTextBtn" title="Enviar comando [Enter]">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </div>
+          <div class="keyboard-hints">
+            <span><kbd>EVI</kbd> Di la palabra mágica</span>
+            <span><kbd>ESPACIO</kbd> Push-to-talk</span>
+            <span><kbd>ENTER</kbd> Enviar</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal de Gestión de Memorias y RAG -->
+  <div class="hud-modal" id="memoryModal">
+    <div class="modal-overlay" id="modalOverlay"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 15h-2v-6h2zm0-8h-2V7h2z"/>
+          </svg>
+          <span>BASE DE CONOCIMIENTO & MEMORIAS PERSISTENTES</span>
+        </div>
+        <button class="modal-close-btn" id="closeModalBtn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="memory-form">
+          <label class="form-label">AGREGAR NUEVO HECHO O PREFERENCIA:</label>
+          <div class="form-row">
+            <input type="text" id="newMemoryInput" placeholder="Ej: Mi framework favorito es NestJS con TypeScript..." />
+            <button class="hud-btn-cyber pink" id="saveMemoryBtn">GUARDAR</button>
+          </div>
+        </div>
+
+        <div class="memory-list-section">
+          <div class="list-header">
+            <span class="list-title">MEMORIAS ALMACENADAS EN POSTGRESQL (PGVECTOR)</span>
+            <button class="refresh-link" id="refreshMemoriesBtn">ACTUALIZAR</button>
+          </div>
+          <div class="memory-items-container" id="memoryItemsContainer">
+            <div class="loading-placeholder">Cargando memorias vectoriales...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Ajustes de EVI Desktop -->
+  <div class="hud-modal" id="settingsModal">
+    <div class="modal-overlay" id="settingsModalOverlay"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>CONFIGURACIÓN DE EVI DESKTOP</span>
+        </div>
+        <button class="modal-close-btn" id="closeSettingsModalBtn">&times;</button>
+      </div>
+
+      <div class="modal-body settings-body">
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-title">Iniciar con Windows</span>
+            <span class="setting-desc">Arranca EVI silenciosamente en la bandeja del sistema al encender tu PC.</span>
+          </div>
+          <label class="cyber-switch">
+            <input type="checkbox" id="settingStartWithWindows">
+            <span class="cyber-slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-title">Modo de Escucha Predeterminado</span>
+            <span class="setting-desc">Elige si EVI siempre escucha la palabra clave "EVI" o solo con pulsación.</span>
+          </div>
+          <select id="settingListeningMode" class="hud-select">
+            <option value="alexa">🎙️ Modo Alexa (Wake Word "EVI")</option>
+            <option value="push">🔘 Modo Push-to-Talk (Espacio / Clic)</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-title">Sensibilidad Wake Word</span>
+            <span class="setting-desc">Sensibilidad del reconocedor continuo de activación (0.3 = estricto, 0.7 = sensible).</span>
+          </div>
+          <div class="slider-val-box">
+            <input type="range" id="settingSensitivity" min="0.1" max="0.9" step="0.05" value="0.5" class="hud-slider">
+            <span id="sensitivityDisplay" style="color:var(--neon-pink);font-family:var(--font-mono);font-size:12px;">0.50</span>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-title">Servidor Backend Orquestador</span>
+            <span class="setting-desc">Dirección WebSocket local del orquestador NestJS.</span>
+          </div>
+          <input type="text" id="settingOrchestratorUrl" class="hud-input-text" value="http://localhost:3000" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

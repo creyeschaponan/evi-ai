@@ -16,6 +16,7 @@ dist/
 build/
 */build/
 orchestrator-nest/dist/
+evi-desktop/out/
 
 # 3. Variables de Entorno y Secretos (NUNCA subir a GitHub)
 .env
@@ -62,6 +63,7 @@ postgres-data/
 *.ogg
 *.flac
 temp_audio/
+!evi-desktop/assets/**
 
 # 8. Logs y Archivos de Depuración
 *.log

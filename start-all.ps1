@@ -79,12 +79,14 @@ Write-Host "`n[4/4] Verificando Backend Orquestador NestJS - puerto 3000..." -Fo
 if (Test-PortOpen 3000) {
     Write-Host "  [OK] El Orquestador NestJS ya esta activo en puerto 3000." -ForegroundColor Green
     Write-Host "`n=================================================" -ForegroundColor Cyan
-    Write-Host "  >>> Dashboard Web listo en: http://localhost:3000" -ForegroundColor Green
+    Write-Host "  >>> Iniciando Aplicacion Nativa EVI Desktop... " -ForegroundColor Magenta
     Write-Host "=================================================" -ForegroundColor Cyan
-    Start-Process "http://localhost:3000"
+    Start-Process powershell -ArgumentList "-NoExit", "-File", "$PSScriptRoot\start-client.ps1"
 } else {
     Write-Host "  [+] Iniciando Backend Orquestador en esta consola..." -ForegroundColor Cyan
-    Write-Host "  --> Una vez iniciado, abre tu navegador en: http://localhost:3000" -ForegroundColor Green
+    Write-Host "  --> Iniciando EVI Desktop en paralelo..." -ForegroundColor Magenta
+    Start-Process powershell -ArgumentList "-NoExit", "-File", "$PSScriptRoot\start-client.ps1"
     Set-Location -Path "$PSScriptRoot\orchestrator-nest"
     npm run start:dev
 }
+

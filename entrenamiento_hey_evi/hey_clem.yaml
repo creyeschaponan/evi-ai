@@ -1,0 +1,108 @@
+# openWakeWord training config for Clem's own wake word.
+#
+# Run with:  python -m openwakeword.train --training_config hey_clem.yaml \
+#                --generate_clips --augment_clips --train_model
+# On a modern stack (torchaudio >=2.2 / scipy >=1.17, e.g. 2026 Colab) run it
+# through wakeword's oww_train_shim.py instead — hey_clem_colab.ipynb writes
+# it — which restores two removed APIs that speechbrain 0.5.14 and acoustics
+# 0.2.6 still import. See README.md for the full runbook and expected data.
+
+model_name: "hey_clem"
+
+# Three phrases, one binary model — it activates on any of them. All were
+# checked with phrase_check.py / espeak-ng: "clem" renders as klˈɛm, so the
+# TTS training data says the name correctly and no creative spelling is needed.
+#
+# "hello clem" (həlˈoʊ klˈɛm, added 2026-08-01) is the
+# robustness anchor: 8 phones, the same count as the known-good "hey jarvis"
+# reference. "hey clem" stays because it is what one naturally blurts at the
+# robot; "okay clem" measured closest to the reference in clip length.
+#
+# "clem" on its own is deliberately absent. Measured median TTS length is
+# 0.46 s against 0.79 s for "hey jarvis"; a wake word that short carries too
+# little acoustic information to separate from ordinary speech, and the price
+# is paid in false accepts, which for Clem means opening the cloud voice
+# connection unbidden.
+target_phrase:
+  - "hey clem"
+  - "okay clem"
+  - "hello clem"
+
+# Near-misses to train against, on top of the phoneme-overlap negatives
+# openWakeWord generates automatically. Each differs from klˈɛm by about one
+# feature, which is exactly where a short wake word gets into trouble.
+custom_negative_phrases:
+  - "hey clam"
+  - "hey glen"
+  - "hey clint"
+  - "hey clemens"
+  - "hey clement"
+  - "hey phlegm"
+  - "hey lem"
+  - "hey ken"
+  - "hey cam"
+  - "hey claire"
+  - "hey clay"
+  - "hey climb"
+  - "hey them"
+  - "okay ben"
+  - "clem"
+  - "hello clam"
+  - "hello glen"
+  - "hello ken"
+  - "hello claire"
+
+# Above the 20,000 the upstream example calls a minimum, because a short wake
+# phrase needs the extra coverage. n_samples is the TOTAL across all target
+# phrases (train.py passes the whole phrase list to one generate_samples call),
+# so 75,000 keeps the original 25,000-per-phrase density now that there are
+# three phrases. On a T4 this is roughly 15 minutes of generation; on 4 CPU
+# cores it is closer to 5 hours (measured: ~4 clips/s).
+n_samples: 75000
+n_samples_val: 7500
+
+tts_batch_size: 50
+augmentation_batch_size: 16
+
+# Each generated clip is augmented twice — cheaper robustness than generating
+# twice as many clips, since the augmentation itself is random.
+augmentation_rounds: 2
+
+# dscripka's fork, NOT rhasspy/piper-sample-generator: train.py does
+# `from generate_samples import generate_samples`, and only the fork has that
+# module at the top level.
+piper_sample_generator_path: "./piper-sample-generator"
+
+output_dir: "./hey_clem_model"
+
+rir_paths:
+  - "./mit_rirs"
+
+background_paths:
+  - "./audioset_16k"
+  - "./fma"
+
+background_paths_duplication_rate:
+  - 1
+  - 1
+
+false_positive_validation_data_path: "./validation_set_features.npy"
+
+feature_data_files:
+  "ACAV100M_sample": "./openwakeword_features_ACAV100M_2000_hrs_16bit.npy"
+
+batch_n_per_class:
+  "ACAV100M_sample": 1024
+  "adversarial_negative": 50
+  "positive": 50
+
+model_type: "dnn"
+layer_size: 32
+
+steps: 50000
+
+max_negative_weight: 1500
+
+# Stricter than the upstream default of 0.2/hr is not necessary, but do not
+# loosen it: Clem's wake word runs all day in a room with a television.
+target_false_positives_per_hour: 0.2
