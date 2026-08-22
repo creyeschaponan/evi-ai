@@ -62,7 +62,7 @@ export class GoogleMcpService {
       `\n- Revisa la bandeja con atención para no omitir correos existentes.` +
       `\n\nREGLAS OBLIGATORIAS DE FORMATO PARA VOZ (EVI):` +
       `\n1. NUNCA uses tablas Markdown (|---|---|) ni bloques de código.` +
-      `\n2. NO menciones fechas completas en formato ISO/UTC ni segundos. Convierte las marcas de tiempo a la hora local de Perú (UTC-5) y menciona solo la hora y minutos (ejemplo: "a las 9:38 de la noche", "a las 8:35 p.m.", "a las 7:51 p.m.").` +
+      `\n2. NO menciones fechas completas en formato ISO/UTC ni segundos. Convierte las marcas de tiempo a la hora local de Perú (UTC-5) y exprésala SIEMPRE en palabras habladas naturales (ejemplo: "a las nueve y treinta y ocho de la noche", "a las ocho y treinta y cinco de la noche", "a las diez de la mañana"). NUNCA uses abreviaturas como "p. m.", "a. m.", "p.m." ni "a.m." para evitar que la voz deletree letras sueltas.` +
       `\n3. Para cada correo encontrado, di en una frase fluida y concisa: quién lo envía, a qué hora llegó y de qué trata.` +
       `\n4. Sé directa, clara y natural para síntesis de voz.`;
 
