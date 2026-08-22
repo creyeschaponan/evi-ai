@@ -63,7 +63,7 @@ if (Test-PortOpen 8080) {
 # -------------------------------------------------------------
 # 3. Verificar y levantar Servidor de Embeddings (Puerto 8081)
 # -------------------------------------------------------------
-Write-Host "`n[3/4] Verificando Servidor de Embeddings - puerto 8081..." -ForegroundColor Yellow
+Write-Host "`n[3/6] Verificando Servidor de Embeddings - puerto 8081..." -ForegroundColor Yellow
 if (Test-PortOpen 8081) {
     Write-Host "  [OK] Servidor de Embeddings puerto 8081 ya esta activo. Omitiendo arranque." -ForegroundColor Green
 } else {
@@ -73,9 +73,33 @@ if (Test-PortOpen 8081) {
 }
 
 # -------------------------------------------------------------
-# 4. Verificar y levantar Orquestador NestJS (Puerto 3000)
+# 4. Verificar y levantar Microservicio CosyVoice 3 (Puerto 50000)
 # -------------------------------------------------------------
-Write-Host "`n[4/4] Verificando Backend Orquestador NestJS - puerto 3000..." -ForegroundColor Yellow
+Write-Host "`n[4/6] Verificando Servidor CosyVoice 3 - puerto 50000..." -ForegroundColor Yellow
+if (Test-PortOpen 50000) {
+    Write-Host "  [OK] Servidor CosyVoice 3 puerto 50000 ya esta activo. Omitiendo arranque." -ForegroundColor Green
+} else {
+    Write-Host "  [+] Iniciando Servidor CosyVoice 3 en ventana independiente..." -ForegroundColor Cyan
+    Start-Process powershell -ArgumentList "-NoExit", "-File", "$PSScriptRoot\start-cosyvoice.ps1"
+    Start-Sleep -Milliseconds 600
+}
+
+# -------------------------------------------------------------
+# 5. Verificar y levantar Native Faster-Whisper CUDA (Puerto 10305)
+# -------------------------------------------------------------
+Write-Host "`n[5/6] Verificando Servidor Faster-Whisper CUDA - puerto 10305..." -ForegroundColor Yellow
+if (Test-PortOpen 10305) {
+    Write-Host "  [OK] Servidor Faster-Whisper CUDA puerto 10305 ya esta activo. Omitiendo arranque." -ForegroundColor Green
+} else {
+    Write-Host "  [+] Iniciando Servidor Faster-Whisper CUDA en ventana independiente..." -ForegroundColor Cyan
+    Start-Process powershell -ArgumentList "-NoExit", "-File", "$PSScriptRoot\start-whisper.ps1"
+    Start-Sleep -Milliseconds 600
+}
+
+# -------------------------------------------------------------
+# 6. Verificar y levantar Orquestador NestJS (Puerto 3000)
+# -------------------------------------------------------------
+Write-Host "`n[6/6] Verificando Backend Orquestador NestJS - puerto 3000..." -ForegroundColor Yellow
 if (Test-PortOpen 3000) {
     Write-Host "  [OK] El Orquestador NestJS ya esta activo en puerto 3000." -ForegroundColor Green
     Write-Host "`n=================================================" -ForegroundColor Cyan
